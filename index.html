@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#10182f" />
+    <meta name="description" content="Keystal Command Centre — a mobile-first revenue operating dashboard." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Keystal" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="icon.svg" />
+    <link rel="apple-touch-icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Keystal Command Centre</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">K</div>
+          <div>
+            <div class="brand-name">Keystone</div>
+            <div class="brand-sub">Advisory / Command Centre</div>
+          </div>
+        </div>
+        <div class="demo-ribbon"><span class="pulse-dot"></span> DEMO DATA</div>
+        <nav class="nav-list">
+          <button class="nav-item active" data-page="today"><span class="nav-icon">◒</span><span>Today</span><span class="nav-key">01</span></button>
+          <button class="nav-item" data-page="pipeline"><span class="nav-icon">⌁</span><span>Pipeline</span><span class="nav-key">02</span></button>
+          <button class="nav-item" data-page="activity"><span class="nav-icon">↗</span><span>Activity</span><span class="nav-key">03</span></button>
+          <button class="nav-item" data-page="settings"><span class="nav-icon">◌</span><span>Settings</span><span class="nav-key">04</span></button>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="agent-status"><span class="status-ring"></span><div><strong>Keystal online</strong><small>Ready for the next move</small></div></div>
+          <div class="quote">Sell first.<br /><em>Build second.</em></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="mobile-brand"><div class="brand-mark small">K</div><span>Keystal</span></div>
+          <div class="topbar-context"><span class="eyebrow">COMMAND CENTRE</span><span class="separator">/</span><span id="page-context">Today</span></div>
+          <div class="topbar-actions"><button class="icon-button" id="install-button" aria-label="Install Keystal" title="Install to home screen">⇩</button><button class="avatar" aria-label="Rayvern profile">R</button></div>
+        </header>
+
+        <section class="page page-active" id="page-today" data-page-view="today">
+          <div class="page-intro">
+            <div>
+              <div class="eyebrow gold">MONDAY · 28 SEP 2026</div>
+              <h1>Good morning, Rayvern<span class="spark">✦</span></h1>
+              <p class="intro-copy">One revenue move at a time. The morning block is protected for conversations.</p>
+            </div>
+            <button class="primary-button" id="sprint-button"><span class="button-dot"></span> Start sales sprint</button>
+          </div>
+
+          <div class="priority-banner">
+            <div class="priority-mark">01</div>
+            <div class="priority-body"><span class="eyebrow gold">THE ONE MOVE</span><strong>Call the 3 warmest opportunities before 10:30.</strong><span>Pipeline is useful only when it becomes a conversation.</span></div>
+            <button class="text-button" data-action="open-pipeline">Open pipeline <span>↗</span></button>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card featured"><div class="metric-label">Weighted pipeline <span class="metric-info">i</span></div><div class="metric-value">S$126.4K</div><div class="metric-foot"><span class="trend positive">↑ 18.2%</span><span>vs last week</span></div><div class="sparkline" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="metric-card"><div class="metric-label">Meetings booked</div><div class="metric-value">03 <small>/ 03</small></div><div class="metric-foot"><span class="trend positive">On target</span><span>this week</span></div></article>
+            <article class="metric-card"><div class="metric-label">Follow-ups due</div><div class="metric-value">07</div><div class="metric-foot"><span class="trend caution">3 today</span><span>next 48 hours</span></div></article>
+            <article class="metric-card"><div class="metric-label">Production gap</div><div class="metric-value">S$640K</div><div class="metric-foot"><span class="trend caution">Sprint focus</span><span>to target</span></div></article>
+          </div>
+
+          <div class="content-grid">
+            <section class="panel pipeline-panel">
+              <div class="panel-heading"><div><span class="eyebrow">CLOSEST TO REVENUE</span><h2>Pipeline moves</h2></div><button class="small-action" data-action="open-pipeline">View all <span>↗</span></button></div>
+              <div class="pipeline-list">
+                <button class="pipeline-row" data-deal="The Atlas Group"><span class="deal-initial">A</span><span class="deal-main"><strong>The Atlas Group</strong><small>Key person continuity · Proposal</small></span><span class="deal-value">S$48K</span><span class="deal-arrow">›</span></button>
+                <button class="pipeline-row" data-deal="Northstar Studio"><span class="deal-initial warm">N</span><span class="deal-main"><strong>Northstar Studio</strong><small>Business loan · Discovery</small></span><span class="deal-value">S$36K</span><span class="deal-arrow">›</span></button>
+                <button class="pipeline-row" data-deal="Mosaic Clinics"><span class="deal-initial soft">M</span><span class="deal-main"><strong>Mosaic Clinics</strong><small>AI calling · Demo booked</small></span><span class="deal-value">S$24K</span><span class="deal-arrow">›</span></button>
+                <button class="pipeline-row" data-deal="Cedar & Co"><span class="deal-initial pale">C</span><span class="deal-main"><strong>Cedar &amp; Co</strong><small>Mortgage · Follow-up</small></span><span class="deal-value">S$18.4K</span><span class="deal-arrow">›</span></button>
+              </div>
+            </section>
+
+            <section class="panel action-panel">
+              <div class="panel-heading"><div><span class="eyebrow">NEXT ACTIONS</span><h2>Keep momentum</h2></div><span class="count-badge" id="action-count">04</span></div>
+              <div class="action-list">
+                <label class="action-row"><input type="checkbox" /><span class="checkmark"></span><span><strong>Call Atlas Group</strong><small>Before 10:30 · warm opportunity</small></span><span class="action-time">09:15</span></label>
+                <label class="action-row"><input type="checkbox" /><span class="checkmark"></span><span><strong>Send Northstar recap</strong><small>Include borrowing range</small></span><span class="action-time">11:30</span></label>
+                <label class="action-row"><input type="checkbox" /><span class="checkmark"></span><span><strong>Confirm Mosaic demo</strong><small>WhatsApp draft only</small></span><span class="action-time">14:00</span></label>
+                <label class="action-row"><input type="checkbox" /><span class="checkmark"></span><span><strong>Ask for 1 referral</strong><small>After the first win</small></span><span class="action-time">16:30</span></label>
+              </div>
+            </section>
+          </div>
+
+          <section class="keystal-strip">
+            <div class="keystal-orb"><span>✦</span></div>
+            <div class="keystal-copy"><span class="eyebrow gold">KEYSTAL IS READY</span><strong>What should Keystal handle next?</strong><span>Draft, prioritise, or prepare — without leaving the dashboard.</span></div>
+            <div class="command-input"><input id="command-input" type="text" placeholder="e.g. Prep me for Atlas Group" aria-label="Tell Keystal what to handle" /><button id="command-submit">Send <span>↗</span></button></div>
+          </section>
+          <div class="safe-note">Demo shell only · live CRM and model connections are not connected yet.</div>
+        </section>
+
+        <section class="page" id="page-pipeline" data-page-view="pipeline">
+          <div class="page-intro compact"><div><div class="eyebrow gold">REVENUE MAP</div><h1>Pipeline<span class="spark">✦</span></h1><p class="intro-copy">Move the closest opportunity, not the loudest task.</p></div><button class="secondary-button">+ Add opportunity</button></div>
+          <div class="pipeline-summary"><div><span class="eyebrow">OPEN OPPORTUNITIES</span><strong>12</strong></div><div><span class="eyebrow">WEIGHTED VALUE</span><strong>S$126.4K</strong></div><div><span class="eyebrow">NEXT CLOSE</span><strong>Atlas Group</strong></div></div>
+          <div class="kanban"><div class="lane"><div class="lane-head"><span>Discovery</span><b>03</b></div><div class="deal-card"><strong>Northstar Studio</strong><span>S$36K</span><small>Borrowing range</small></div><div class="deal-card"><strong>Ridgeway Foods</strong><span>S$22K</span><small>Intro booked</small></div></div><div class="lane focus-lane"><div class="lane-head"><span>Proposal / follow-up</span><b>02</b></div><div class="deal-card highlight"><strong>The Atlas Group</strong><span>S$48K</span><small>Call before 10:30</small></div><div class="deal-card"><strong>Cedar &amp; Co</strong><span>S$18.4K</span><small>Decision Friday</small></div></div><div class="lane"><div class="lane-head"><span>Meeting booked</span><b>03</b></div><div class="deal-card"><strong>Mosaic Clinics</strong><span>S$24K</span><small>AI demo · Today</small></div></div></div>
+        </section>
+
+        <section class="page" id="page-activity" data-page-view="activity">
+          <div class="page-intro compact"><div><div class="eyebrow gold">OPERATING RHYTHM</div><h1>Activity<span class="spark">✦</span></h1><p class="intro-copy">A short trail of moves that create momentum.</p></div><button class="secondary-button">Export log</button></div>
+          <div class="activity-feed"><div class="feed-day"><span class="eyebrow">TODAY</span><div class="feed-row"><span class="feed-icon gold-icon">↗</span><div><strong>Follow-up added</strong><p>Northstar Studio · borrowing range recap</p></div><time>08:42</time></div><div class="feed-row"><span class="feed-icon">◒</span><div><strong>Meeting booked</strong><p>Mosaic Clinics · AI calling demo</p></div><time>08:17</time></div></div><div class="feed-day"><span class="eyebrow">YESTERDAY</span><div class="feed-row"><span class="feed-icon">✦</span><div><strong>Pipeline advanced</strong><p>The Atlas Group · discovery → proposal</p></div><time>16:20</time></div><div class="feed-row"><span class="feed-icon">✓</span><div><strong>Task completed</strong><p>Send weekly referral ask to BNI contacts</p></div><time>14:05</time></div></div></div>
+        </section>
+
+        <section class="page" id="page-settings" data-page-view="settings">
+          <div class="page-intro compact"><div><div class="eyebrow gold">CONTROL ROOM</div><h1>Settings<span class="spark">✦</span></h1><p class="intro-copy">Connect the sources that make Keystal useful.</p></div></div>
+          <div class="settings-list"><div class="setting-row"><div><strong>CRM connection</strong><p>Connect Airtable or another source of truth.</p></div><span class="connection-pill pending">Not connected</span><button class="small-action">Configure</button></div><div class="setting-row"><div><strong>Keystal AI endpoint</strong><p>Server-side model route required for live commands.</p></div><span class="connection-pill pending">Not connected</span><button class="small-action">Configure</button></div><div class="setting-row"><div><strong>Install on iPad / iPhone</strong><p>Open the live URL in Safari, then Share → Add to Home Screen.</p></div><span class="connection-pill ready">PWA ready</span><button class="small-action" id="install-settings">Install</button></div></div>
+          <div class="security-note"><span>⌁</span><div><strong>Private-by-default phase two</strong><p>The current demo contains no real client data. Before adding CRM records, put this behind authentication and a server-side API.</p></div></div>
+        </section>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="modal-backdrop" id="modal" aria-hidden="true"><div class="modal"><button class="modal-close" id="modal-close" aria-label="Close">×</button><span class="eyebrow gold">OPPORTUNITY</span><h2 id="modal-title">The Atlas Group</h2><p id="modal-copy">Key person continuity · Proposal stage</p><div class="modal-actions"><button class="secondary-button" id="modal-draft">Draft prep</button><button class="primary-button" id="modal-action">Next action <span>↗</span></button></div></div></div>
+    <script src="app.js"></script>
+  </body>
+</html>

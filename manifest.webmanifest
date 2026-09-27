@@ -1,0 +1,13 @@
+{
+  "name": "Keystal Command Centre",
+  "short_name": "Keystal",
+  "description": "Mobile-first revenue command centre for Rayvern.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fa",
+  "theme_color": "#10182f",
+  "orientation": "any",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
