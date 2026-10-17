@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""Build a public, read-only preview; never copy runtime data or vault documents."""
+from pathlib import Path
+import re
+
+root = Path(__file__).resolve().parent
+out = root.parent / 'preview'
+out.mkdir(exist_ok=True)
+html = (root / 'index.html').read_text()
+html = html.replace('href="/icon.svg"', 'href="../local-os/icon.svg"').replace('href="/styles.css"', 'href="../local-os/styles.css"').replace('href="/"', 'href="./"')
+html = html.replace('<title>Keystal OS · Your command centre</title>', '<title>Keystal OS · Public preview</title>')
+html = html.replace('Local workspace · this Mac', 'Public design preview').replace(' LOCAL MODE', ' PREVIEW ONLY')
+html = html.replace('<button id="open-capture" class="button small gold">＋ Capture</button>', '<span class="button small outline">Read-only preview</span>')
+html = html.replace('<p>A clear desk for your decisions. Keystal handles the preparation.</p>', '<p>Public, read-only preview. No private data, live chat or connected accounts.</p>')
+html = html.replace('<div id="focus-content"></div>', '<div id="focus-content"><h2 class="focus-title">One command.<br>One next move.</h2><p class="focus-description">Explore the OS layout on any device. Your actual captures and conversations stay on your Mac.</p><div class="focus-footer"><span>PREVIEW · NO LIVE WORKSPACE</span><button class="button gold" data-go="connections">See what needs hosting ↗</button></div></div>')
+html = html.replace('<div class="desk-list" id="desk-list"></div>', '<div class="empty-desk"><strong>No private workspace data is published.</strong><p>This preview deliberately has no tasks, conversations, client information or pipeline figures.</p></div>')
+html = html.replace('Captures are local drafts. ClickUp remains the execution record.', 'Capture controls are disabled here. The working local app stores drafts on the Mac.')
+
+def section(name, body):
+    global html
+    pattern = rf'<section class="page" data-page="{name}" hidden>.*?</section>'
+    html = re.sub(pattern, lambda _: f'<section class="page" data-page="{name}" hidden>{body}</section>', html, flags=re.S)
+
+section('captures', '''<div class="page-heading"><div><span class="eyebrow">CAPTURE → CLARIFY → ACT</span><h1>Get it off your mind.</h1><p>Capture inbox layout · read-only public preview.</p></div></div><div class="empty-desk"><strong>Your captures are not uploaded.</strong><p>In the working local app, add an action, choose its work lane, set an owner and target date, then pin it or prepare it with Keystal. This preview does not accept or store input.</p></div><p class="footnote">No browser storage, no sync and no ClickUp updates from this page.</p>''')
+section('knowledge', '''<div class="page-heading"><div><span class="eyebrow">THE SHARED BRAIN</span><h1>Context, not clutter.</h1><p>Your knowledge stays private.</p></div></div><div class="knowledge-banner"><span>▤</span><div><strong>Obsidian / Dropbox remains the knowledge source</strong><p>No vault documents are included in this public preview.</p></div></div><div class="empty-desk"><strong>Private documents are available only in the local app.</strong><p>The local Knowledge view opens saved operating manuals and setup documents. Publishing this layout does not publish your shared brain.</p></div>''')
+section('activity', '''<div class="page-heading"><div><span class="eyebrow">EVIDENCE OVER ASSUMPTIONS</span><h1>What actually happened.</h1><p>No activity history is exposed in this preview.</p></div></div><div class="empty-desk"><strong>No simulated completions.</strong><p>The working local app records captures, chat requests and connection checks. This public page contains no events or conversations.</p></div>''')
+section('connections', '''<div class="page-heading"><div><span class="eyebrow">CLEAR BOUNDARIES</span><h1>Know what's connected.</h1><p>Public preview and working backend are separate.</p></div></div><div class="connection-row"><div><strong>GitHub Pages</strong><p>Hosts this static layout. You can view it away from your Mac.</p><span class="badge good">STATIC PREVIEW</span></div></div><div class="connection-row"><div><strong>Hermes chat</strong><p>No backend endpoint or credentials are embedded here. Chat requires the local app or a future authenticated deployment.</p><span class="badge pending">NOT CONNECTED HERE</span></div></div><div class="connection-row"><div><strong>Dropbox · ClickUp · Airtable · Calendar</strong><p>No private documents, records, access tokens or live adapters are published.</p><span class="badge pending">NO PUBLIC ACCESS</span></div></div><div class="deployment-note"><span class="eyebrow">NEXT RELEASE GATE</span><h2>The interface travels.<br>The agent needs hosting.</h2><p>To use live Hermes while the Mac is off, deploy an authenticated backend. Do not expose the loopback-only Python server through a public tunnel.</p><a class="button outline" href="https://github.com/RainingWealth/keystal-command-centre/tree/main/local-os" target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a></div>''')
+chat = '''<aside class="chat-panel" aria-label="Ask Keystal preview"><div class="chat-head"><div class="keystal-icon">✦</div><div><h2>Ask Keystal</h2><span>Preview only · chat is offline here</span></div></div><div class="messages"><div class="welcome"><span class="eyebrow">YOUR THINKING PARTNER</span><h3>Less juggling.<br>More forward motion.</h3><p>The local app has real Hermes chat. This public preview shows the interface without exposing your agent or conversations.</p><button class="suggestion" data-go="connections">What needs hosting? <span>↗</span></button></div></div><div class="composer"><textarea aria-label="Chat disabled in public preview" placeholder="Chat requires the authenticated backend" disabled></textarea><div class="composer-bottom"><span>PUBLIC PREVIEW</span><button class="button gold" disabled>Chat unavailable</button></div></div><p class="chat-safety">Do not enter private information here.<br>No prompts are sent from this preview.</p></aside>'''
+html = re.sub(r'<aside class="chat-panel".*?</aside>', lambda _: chat, html, flags=re.S)
+html = re.sub(r'<dialog\b.*?</dialog>', '', html, flags=re.S)
+html = html.replace('Connecting to local workspace…', 'Static preview · no backend connection').replace('PRIVATE TO THIS MAC · NOT CLOUD-HOSTED', 'PUBLIC PREVIEW · NO PRIVATE DATA')
+html = html.replace('<script src="/app.js"></script>', '<script src="./preview.js"></script>')
+html = html.replace('id="capture-badge">—', 'id="capture-badge">—')
+(out / 'index.html').write_text(html)
+print('Built public preview from layout only; no runtime data read.')

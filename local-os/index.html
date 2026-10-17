@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10182f"><link rel="icon" href="/icon.svg"><link rel="stylesheet" href="/styles.css">
+<title>Keystal OS · Your command centre</title>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+<a class="brand" href="/" aria-label="Keystal OS home"><span class="brandmark">K<span>✦</span></span><span>keystal<span class="brand-sub">PERSONAL OPERATING SYSTEM</span></span></a>
+<div class="workspace-tag"><span class="dot"></span> RAYVERN'S WORKSPACE</div>
+<nav aria-label="Workspace">
+<button class="nav active" data-view="today"><span>◒</span>Today<span class="nav-tail">01</span></button>
+<button class="nav" data-view="captures"><span>⌑</span>Capture inbox<span class="nav-tail" id="capture-badge">—</span></button>
+<button class="nav" data-view="knowledge"><span>▤</span>Knowledge<span class="nav-tail">03</span></button>
+<button class="nav" data-view="activity"><span>↗</span>Activity<span class="nav-tail">04</span></button>
+<button class="nav" data-view="connections"><span>⌁</span>Connections<span class="nav-tail">05</span></button>
+</nav>
+<div class="sidebar-note"><span class="eyebrow">THE OPERATING PRINCIPLE</span><p>One command.<br>One next move.</p><span>Keystal decides.<br>Raios coordinates.</span></div>
+<div class="sidebar-bottom"><div class="avatar">R</div><div><strong>Rayvern</strong><small>Local workspace · this Mac</small></div></div>
+</aside>
+<div class="main-shell">
+<header class="topbar"><div class="breadcrumb"><strong>Keystal OS</strong><span>/</span><span id="page-name">Today</span></div><div class="top-actions"><span class="local-status"><span class="dot"></span> LOCAL MODE</span><button id="open-capture" class="button small gold">＋ Capture</button></div></header>
+<div class="workspace">
+<main class="main-content" id="main-content">
+<section class="page" data-page="today">
+<div class="page-heading"><div><div class="eyebrow" id="today-date">YOUR WORKSPACE</div><h1>Make the next move.</h1><p>A clear desk for your decisions. Keystal handles the preparation.</p></div><span class="star" aria-hidden="true">✦</span></div>
+<article class="focus-panel"><div class="focus-heading"><span class="eyebrow">YOUR ONE MOVE</span><span class="chip">YOU CHOOSE THE PRIORITY</span></div><div id="focus-content"></div></article>
+<div class="section-heading"><h2>On your desk</h2><button class="link-button" data-go="captures">Open capture inbox ↗</button></div>
+<div class="desk-list" id="desk-list"></div>
+<div class="work-lanes"><span class="eyebrow">YOUR WORK LANES</span><div><button data-lane="Sell">Sell <span>↗</span></button><button data-lane="Serve">Serve <span>↗</span></button><button data-lane="Operate">Operate <span>↗</span></button><button data-lane="Build">Build <span>↗</span></button><button data-lane="Personal">Personal <span>↗</span></button></div><p>Captures are local drafts. ClickUp remains the execution record.</p></div>
+<div class="source-strip"><div><span class="eyebrow">REVENUE VIEW</span><h3>No invented numbers.</h3><p>Pipeline, money at risk and calendar stay unavailable until their sources are connected to this OS.</p></div><button class="button outline" data-go="connections">Inspect connections ↗</button></div>
+</section>
+<section class="page" data-page="captures" hidden>
+<div class="page-heading"><div><span class="eyebrow">CAPTURE → CLARIFY → ACT</span><h1>Get it off your mind.</h1><p>Persistent draft staging, not another task manager.</p></div></div>
+<div class="toolbar"><label class="search"><span>⌕</span><input id="capture-search" placeholder="Search your captures" aria-label="Search captures"></label><label class="checkbox"><input type="checkbox" id="show-archived"> Include archived</label><button class="button gold" id="capture-add">＋ New capture</button></div>
+<div id="capture-list" class="capture-list"></div>
+<p class="footnote">Pin a draft as your one move, ask Keystal to prepare it, or archive it. These actions do not update ClickUp.</p>
+</section>
+<section class="page" data-page="knowledge" hidden>
+<div class="page-heading"><div><span class="eyebrow">THE SHARED BRAIN</span><h1>Context, not clutter.</h1><p>Your existing OS documents. No new knowledge database.</p></div></div>
+<div class="knowledge-banner"><span>▤</span><div><strong>Obsidian / Dropbox is the source of truth</strong><p>These are saved local documents. Use Connections to check live vault access.</p></div></div>
+<div class="document-list" id="document-list"></div>
+</section>
+<section class="page" data-page="activity" hidden>
+<div class="page-heading"><div><span class="eyebrow">EVIDENCE OVER ASSUMPTIONS</span><h1>What actually happened.</h1><p>Real events from this local workbench. No simulated completions.</p></div></div>
+<div class="toolbar"><span class="footnote">Captures and conversations survive page reloads.</span><button class="button outline" id="export-workspace">Export local workspace ↓</button></div>
+<div id="event-list" class="event-list"></div>
+</section>
+<section class="page" data-page="connections" hidden>
+<div class="page-heading"><div><span class="eyebrow">CLEAR BOUNDARIES</span><h1>Know what's connected.</h1><p>Installed, reachable and verified are different things.</p></div></div>
+<div id="connection-list"></div>
+<div class="deployment-note"><span class="eyebrow">EVERYWHERE IS THE NEXT PHASE</span><h2>Built here. Not hosted yet.</h2><p>This address works on this Mac while the local server runs. No provider has been purchased, no gateway restarted, and no public API exposed. The hosting choice remains yours.</p><button class="button outline" data-doc="setup">Read deployment guide ↗</button></div>
+</section>
+</main>
+<aside class="chat-panel" aria-label="Ask Keystal">
+<div class="chat-head"><div class="keystal-icon">✦</div><div><h2>Ask Keystal</h2><span id="chat-status">Local Hermes bridge</span></div><button id="new-thread" class="icon-button" title="New conversation" aria-label="New conversation">＋</button></div>
+<div class="thread-select"><select id="threads" aria-label="Saved conversations"><option value="">New conversation</option></select></div>
+<div id="messages" class="messages" aria-live="polite"></div>
+<div id="run-status" class="run-status" hidden></div>
+<form id="chat-form" class="composer"><label for="prompt" class="sr-only">Message Keystal</label><textarea id="prompt" rows="3" maxlength="6000" placeholder="What should we move forward?" required></textarea><div class="composer-bottom"><span>DRAFT + RESEARCH</span><button class="button gold" id="send-message" type="submit">Ask Keystal ↗</button></div></form>
+<p class="chat-safety">Use [CLIENT] placeholders. No private client details.<br>No sends, bookings or CRM changes from this bridge.</p>
+</aside>
+</div>
+<footer class="statusbar"><span><span class="dot"></span> <span id="server-status">Connecting to local workspace…</span></span><span>PRIVATE TO THIS MAC · NOT CLOUD-HOSTED</span></footer>
+</div>
+</div>
+<dialog id="capture-dialog"><form id="capture-form"><div class="dialog-top"><span class="eyebrow">CLEAR YOUR HEAD</span><button class="icon-button" type="button" data-close="capture-dialog" aria-label="Close capture">×</button></div><h2>Capture the next move.</h2><p class="dialog-description">Saved on this Mac. Not sent to ClickUp or anyone else.</p><label>What needs attention?<textarea name="title" id="capture-title" maxlength="400" rows="3" placeholder="e.g. Prepare a discovery-call question set" required></textarea></label><div class="form-grid"><label>Work lane<select id="capture-lane" name="lane"><option>Sell</option><option>Serve</option><option>Operate</option><option>Build</option><option>Personal</option></select></label><label>Owner<input name="owner" maxlength="80" value="Ray" required></label></div><label>Target date <span class="optional">optional</span><input name="due" type="date"></label><div class="dialog-actions"><span>Use placeholders for client details.</span><button class="button gold" type="submit">Save local capture ↗</button></div></form></dialog>
+<dialog id="document-dialog"><div class="dialog-top"><span class="eyebrow">SAVED OS DOCUMENT</span><button class="icon-button" data-close="document-dialog" aria-label="Close document">×</button></div><h2 id="document-title"></h2><p class="footnote" id="document-source"></p><article id="document-content" class="document-content"></article></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+<script src="/app.js"></script>
+</body></html>

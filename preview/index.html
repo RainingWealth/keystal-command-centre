@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10182f"><link rel="icon" href="../local-os/icon.svg"><link rel="stylesheet" href="../local-os/styles.css">
+<title>Keystal OS · Public preview</title>
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+<a class="brand" href="./" aria-label="Keystal OS home"><span class="brandmark">K<span>✦</span></span><span>keystal<span class="brand-sub">PERSONAL OPERATING SYSTEM</span></span></a>
+<div class="workspace-tag"><span class="dot"></span> RAYVERN'S WORKSPACE</div>
+<nav aria-label="Workspace">
+<button class="nav active" data-view="today"><span>◒</span>Today<span class="nav-tail">01</span></button>
+<button class="nav" data-view="captures"><span>⌑</span>Capture inbox<span class="nav-tail" id="capture-badge">—</span></button>
+<button class="nav" data-view="knowledge"><span>▤</span>Knowledge<span class="nav-tail">03</span></button>
+<button class="nav" data-view="activity"><span>↗</span>Activity<span class="nav-tail">04</span></button>
+<button class="nav" data-view="connections"><span>⌁</span>Connections<span class="nav-tail">05</span></button>
+</nav>
+<div class="sidebar-note"><span class="eyebrow">THE OPERATING PRINCIPLE</span><p>One command.<br>One next move.</p><span>Keystal decides.<br>Raios coordinates.</span></div>
+<div class="sidebar-bottom"><div class="avatar">R</div><div><strong>Rayvern</strong><small>Public design preview</small></div></div>
+</aside>
+<div class="main-shell">
+<header class="topbar"><div class="breadcrumb"><strong>Keystal OS</strong><span>/</span><span id="page-name">Today</span></div><div class="top-actions"><span class="local-status"><span class="dot"></span> PREVIEW ONLY</span><span class="button small outline">Read-only preview</span></div></header>
+<div class="workspace">
+<main class="main-content" id="main-content">
+<section class="page" data-page="today">
+<div class="page-heading"><div><div class="eyebrow" id="today-date">YOUR WORKSPACE</div><h1>Make the next move.</h1><p>Public, read-only preview. No private data, live chat or connected accounts.</p></div><span class="star" aria-hidden="true">✦</span></div>
+<article class="focus-panel"><div class="focus-heading"><span class="eyebrow">YOUR ONE MOVE</span><span class="chip">YOU CHOOSE THE PRIORITY</span></div><div id="focus-content"><h2 class="focus-title">One command.<br>One next move.</h2><p class="focus-description">Explore the OS layout on any device. Your actual captures and conversations stay on your Mac.</p><div class="focus-footer"><span>PREVIEW · NO LIVE WORKSPACE</span><button class="button gold" data-go="connections">See what needs hosting ↗</button></div></div></article>
+<div class="section-heading"><h2>On your desk</h2><button class="link-button" data-go="captures">Open capture inbox ↗</button></div>
+<div class="empty-desk"><strong>No private workspace data is published.</strong><p>This preview deliberately has no tasks, conversations, client information or pipeline figures.</p></div>
+<div class="work-lanes"><span class="eyebrow">YOUR WORK LANES</span><div><button data-lane="Sell">Sell <span>↗</span></button><button data-lane="Serve">Serve <span>↗</span></button><button data-lane="Operate">Operate <span>↗</span></button><button data-lane="Build">Build <span>↗</span></button><button data-lane="Personal">Personal <span>↗</span></button></div><p>Capture controls are disabled here. The working local app stores drafts on the Mac.</p></div>
+<div class="source-strip"><div><span class="eyebrow">REVENUE VIEW</span><h3>No invented numbers.</h3><p>Pipeline, money at risk and calendar stay unavailable until their sources are connected to this OS.</p></div><button class="button outline" data-go="connections">Inspect connections ↗</button></div>
+</section>
+<section class="page" data-page="captures" hidden><div class="page-heading"><div><span class="eyebrow">CAPTURE → CLARIFY → ACT</span><h1>Get it off your mind.</h1><p>Capture inbox layout · read-only public preview.</p></div></div><div class="empty-desk"><strong>Your captures are not uploaded.</strong><p>In the working local app, add an action, choose its work lane, set an owner and target date, then pin it or prepare it with Keystal. This preview does not accept or store input.</p></div><p class="footnote">No browser storage, no sync and no ClickUp updates from this page.</p></section>
+<section class="page" data-page="knowledge" hidden><div class="page-heading"><div><span class="eyebrow">THE SHARED BRAIN</span><h1>Context, not clutter.</h1><p>Your knowledge stays private.</p></div></div><div class="knowledge-banner"><span>▤</span><div><strong>Obsidian / Dropbox remains the knowledge source</strong><p>No vault documents are included in this public preview.</p></div></div><div class="empty-desk"><strong>Private documents are available only in the local app.</strong><p>The local Knowledge view opens saved operating manuals and setup documents. Publishing this layout does not publish your shared brain.</p></div></section>
+<section class="page" data-page="activity" hidden><div class="page-heading"><div><span class="eyebrow">EVIDENCE OVER ASSUMPTIONS</span><h1>What actually happened.</h1><p>No activity history is exposed in this preview.</p></div></div><div class="empty-desk"><strong>No simulated completions.</strong><p>The working local app records captures, chat requests and connection checks. This public page contains no events or conversations.</p></div></section>
+<section class="page" data-page="connections" hidden><div class="page-heading"><div><span class="eyebrow">CLEAR BOUNDARIES</span><h1>Know what's connected.</h1><p>Public preview and working backend are separate.</p></div></div><div class="connection-row"><div><strong>GitHub Pages</strong><p>Hosts this static layout. You can view it away from your Mac.</p><span class="badge good">STATIC PREVIEW</span></div></div><div class="connection-row"><div><strong>Hermes chat</strong><p>No backend endpoint or credentials are embedded here. Chat requires the local app or a future authenticated deployment.</p><span class="badge pending">NOT CONNECTED HERE</span></div></div><div class="connection-row"><div><strong>Dropbox · ClickUp · Airtable · Calendar</strong><p>No private documents, records, access tokens or live adapters are published.</p><span class="badge pending">NO PUBLIC ACCESS</span></div></div><div class="deployment-note"><span class="eyebrow">NEXT RELEASE GATE</span><h2>The interface travels.<br>The agent needs hosting.</h2><p>To use live Hermes while the Mac is off, deploy an authenticated backend. Do not expose the loopback-only Python server through a public tunnel.</p><a class="button outline" href="https://github.com/RainingWealth/keystal-command-centre/tree/main/local-os" target="_blank" rel="noopener noreferrer">View source on GitHub ↗</a></div></section>
+</main>
+<aside class="chat-panel" aria-label="Ask Keystal preview"><div class="chat-head"><div class="keystal-icon">✦</div><div><h2>Ask Keystal</h2><span>Preview only · chat is offline here</span></div></div><div class="messages"><div class="welcome"><span class="eyebrow">YOUR THINKING PARTNER</span><h3>Less juggling.<br>More forward motion.</h3><p>The local app has real Hermes chat. This public preview shows the interface without exposing your agent or conversations.</p><button class="suggestion" data-go="connections">What needs hosting? <span>↗</span></button></div></div><div class="composer"><textarea aria-label="Chat disabled in public preview" placeholder="Chat requires the authenticated backend" disabled></textarea><div class="composer-bottom"><span>PUBLIC PREVIEW</span><button class="button gold" disabled>Chat unavailable</button></div></div><p class="chat-safety">Do not enter private information here.<br>No prompts are sent from this preview.</p></aside>
+</div>
+<footer class="statusbar"><span><span class="dot"></span> <span id="server-status">Static preview · no backend connection</span></span><span>PUBLIC PREVIEW · NO PRIVATE DATA</span></footer>
+</div>
+</div>
+
+
+<div id="toast" class="toast" role="status" hidden></div>
+<script src="./preview.js"></script>
+</body></html>
