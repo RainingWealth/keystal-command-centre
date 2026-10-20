@@ -44,12 +44,17 @@ def open_ro(db):
     return sqlite3.connect(f'{db.as_uri()}?mode=ro', uri=True, timeout=15)
 
 
+def qi(name):
+    """Quote an SQL identifier. Names come from a possibly foreign database, so they are never trusted."""
+    return '"' + str(name).replace('"', '""') + '"'
+
+
 def tables_of(c):
-    return {r[0]: [x[1] for x in c.execute(f'PRAGMA table_info("{r[0]}")')] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")}
+    return {r[0]: [x[1] for x in c.execute(f'PRAGMA table_info({qi(r[0])})')] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")}
 
 
 def counts_of(c):
-    return {t: c.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0] for t in tables_of(c)}
+    return {t: c.execute(f'SELECT COUNT(*) FROM {qi(t)}').fetchone()[0] for t in tables_of(c)}
 
 
 def counts_at(path):
@@ -88,14 +93,13 @@ def classify(c, plan):
     return f'keystal schema v{version}'
 
 
-def invariants(c):
-    tables = tables_of(c)
-    out = {}
-    if 'agent_tasks' in tables and 'agent_task_evidence' in tables:
-        out['completed_without_approval_and_evidence'] = c.execute("""SELECT COUNT(*) FROM agent_tasks t WHERE t.status='completed' AND t.requires_review=1
-            AND (t.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=t.id))""").fetchone()[0]
-    fk = c.execute('PRAGMA foreign_key_check').fetchall()
-    out['foreign_key_violations'] = len(fk)
+invariants = migrations.invariants
+
+
+def warnings_for(inv):
+    out = []
+    if inv.get('completed_without_approval_and_evidence'):
+        out.append(f"{inv['completed_without_approval_and_evidence']} completed task(s) need review but have no approval and evidence (they predate the approval gate, or the gate was bypassed). They are flagged in the dashboard; reopen them to review.")
     return out
 
 
@@ -106,11 +110,12 @@ def cmd_inspect(args):
         plan = migrations.plan(db)
         report = {'database': str(db.resolve()), 'user_version': plan['current'], 'latest_version': plan['latest'], 'pending_migrations': plan['pending'],
                   'classification': classify(c, plan), 'integrity': c.execute('PRAGMA quick_check').fetchone()[0],
-                  'tables': {t: {'columns': cols, 'rows': c.execute(f'SELECT COUNT(*) FROM "{t}"').fetchone()[0]} for t, cols in tables_of(c).items()},
+                  'tables': {t: {'columns': cols, 'rows': c.execute(f'SELECT COUNT(*) FROM {qi(t)}').fetchone()[0]} for t, cols in tables_of(c).items()},
                   'conflicts': plan['conflicts'], 'invariants': invariants(c), 'read_only': True, 'content_read': False}
     finally:
         c.close()
-    bad = report['integrity'] != 'ok' or report['conflicts'] or plan.get('newer_than_code') or any(report['invariants'].values())
+    report['warnings'] = warnings_for(report['invariants'])
+    bad = report['integrity'] != 'ok' or report['conflicts'] or plan.get('newer_than_code') or report['invariants'].get('foreign_key_violations')
     return report, 3 if bad else 0
 
 
@@ -225,9 +230,10 @@ def cmd_migrate_check(args):
                 inv = invariants(c)
                 integrity = c.execute('PRAGMA integrity_check').fetchone()[0]
                 c.close()
-                report.update(result='OK' if not lost and integrity == 'ok' and not any(inv.values()) else 'PROBLEM', existing_table_row_counts_preserved=not lost, rows_changed=lost,
-                              integrity=integrity, invariants=inv, backup_taken_by_real_run=bool(outcome['backup']) or 'yes, before the first migration if the database holds data')
-                if lost or integrity != 'ok' or any(inv.values()):
+                ok = not lost and integrity == 'ok' and not inv.get('foreign_key_violations')
+                report.update(result=('OK' if not warnings_for(inv) else 'OK with warnings') if ok else 'PROBLEM', existing_table_row_counts_preserved=not lost, rows_changed=lost,
+                              integrity=integrity, invariants=inv, warnings=warnings_for(inv), backup_taken_by_real_run=bool(outcome['backup']) or 'yes, before the first migration if the database holds data')
+                if not ok:
                     problems.append('post-migration check failed')
         report['live_database_unchanged'] = sha256(Path(args.db)) == before_hash
         return report, 3 if problems else 0
@@ -292,13 +298,13 @@ def cmd_quarantine(args):
                 row = c.execute("SELECT type,sql FROM sqlite_master WHERE name=? AND type IN ('index','trigger')", (name,)).fetchone()
                 if row and row[1]:
                     ddl[name] = row[1]
-                    c.execute(f'DROP {row[0].upper()} "{name}"')
+                    c.execute(f'DROP {"INDEX" if row[0] == "index" else "TRIGGER"} {qi(name)}')
             for name, (kind, sql) in owned.items():
                 ddl[name] = sql
-                c.execute(f'DROP {kind.upper()} "{name}"')
+                c.execute(f'DROP {"INDEX" if kind == "index" else "TRIGGER"} {qi(name)}')
             c.execute('PRAGMA legacy_alter_table=ON')
             for old, new in rename.items():
-                c.execute(f'ALTER TABLE "{old}" RENAME TO "{new}"')
+                c.execute(f'ALTER TABLE {qi(old)} RENAME TO {qi(new)}')
             c.execute('COMMIT')
         except BaseException:
             c.execute('ROLLBACK')
@@ -318,6 +324,7 @@ def main(argv=None):
     sub = parser.add_subparsers(dest='cmd', required=True)
     for name in ('inspect', 'backup', 'migrate-check', 'quarantine'):
         p = sub.add_parser(name)
+        # Default backups go next to the database: same disk. Keep a second copy somewhere else (--out to another drive).
         p.add_argument('--db', default=str(default_db()), help='database file (default: the Keystal OS workbench database)')
         if name in ('backup', 'quarantine'):
             p.add_argument('--out', help='directory for backups (default: backups/ next to the database)')

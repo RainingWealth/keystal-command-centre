@@ -146,7 +146,7 @@ class Validation(ApiCase):
     def test_unknown_task_is_404(self):
         bodies = {'/api/agent-tasks/status': {'status': 'running'}, '/api/agent-tasks/note': {'note': 'x'}, '/api/agent-tasks/evidence': {'label': 'x'},
                   '/api/agent-tasks/review': {'decision': 'approve'}, '/api/agent-tasks/update': {'title': 'x'}, '/api/agent-tasks/unlink': {'ref_id': 1},
-                  '/api/agent-tasks/session': {'agent_id': 'codex', 'session_ref': 's1'}, '/api/agent-tasks/link': {'provider': 'clickup', 'instance': 'w', 'scope': 's', 'external_id': 'x'}}
+                  '/api/agent-tasks/session': {'agent_id': 'codex', 'session_ref': 's1'}, '/api/agent-tasks/link': {'provider': 'clickup', 'scope': 's', 'external_id': 'x'}}
         for path, body in bodies.items():
             self.assertEqual(self.c.post(path, {'id': 'f' * 32, **body})[0], 404, path)
 

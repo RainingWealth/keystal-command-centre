@@ -12,6 +12,7 @@ execution. This app aggregates and links to them (read-only for Hermes) and keep
 delegation, review and evidence records. It is never a third execution authority.
 """
 import datetime as dt
+import hashlib
 import json
 import os
 import re
@@ -41,6 +42,8 @@ KANBAN_MAX_STORED = 1000
 ID_PART = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}')
 REF_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:/@+=-]{0,127}')
 TASK_FIELDS = ('title', 'description', 'agent_id', 'priority', 'lane', 'due', 'requires_review', 'project')
+REQUEST_KEY = re.compile(r'[A-Za-z0-9_-]{16,80}')
+CLICKUP_INSTANCE = 'app.clickup.com'
 PROVIDERS = ('clickup', 'hermes_kanban')
 
 
@@ -189,7 +192,17 @@ def event(c, now, label, kind='agent'):
 # ----------------------------------------------------------------- mutations
 
 def create_task(c, now, data):
-    strict(data, TASK_FIELDS)
+    strict(data, TASK_FIELDS + ('request_key',))
+    key = data.get('request_key')
+    if key is not None:
+        if not isinstance(key, str) or not REQUEST_KEY.fullmatch(key):
+            raise ApiError('Invalid request_key')
+        digest = hashlib.sha256(json.dumps({k: data.get(k) for k in TASK_FIELDS}, sort_keys=True).encode()).hexdigest()
+        seen = c.execute('SELECT task_id,payload_hash FROM agent_task_requests WHERE request_key=?', (key,)).fetchone()
+        if seen:
+            if seen['payload_hash'] != digest:
+                raise ApiError('This request key was already used for a different task.', 409)
+            return 200, {'id': seen['task_id'], 'scope': 'local-tracking', 'replayed': True}
     title = field(data, 'title', 200, required=True)
     description = field(data, 'description', 4000)
     agent_id = agent_ref(c, data.get('agent_id'))
@@ -202,6 +215,8 @@ def create_task(c, now, data):
     c.execute('INSERT INTO agent_tasks(id,title,description,agent_id,status,status_source,review_state,requires_review,priority,lane,due,project_id,created,updated,status_changed) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
               (tid, title, description, agent_id, 'queued', 'manual', 'none', requires_review, priority, lane, due, pid, now, now, now))
     name = c.execute('SELECT name FROM agents WHERE id=?', (agent_id,)).fetchone() if agent_id else None
+    if key is not None:
+        c.execute('INSERT INTO agent_task_requests(request_key,task_id,payload_hash,created) VALUES(?,?,?,?)', (key, tid, digest, now))
     log(c, now, tid, 'created', 'manual', 'You', to_value='queued', note=f'Created and assigned to {name["name"]}' if name else 'Created, not yet assigned')
     event(c, now, f'Agent task saved locally{" for " + name["name"] if name else ""} — tracking only, no agent contacted')
     return 201, {'id': tid, 'scope': 'local-tracking'}
@@ -308,7 +323,7 @@ def add_evidence(c, now, data):
     c.execute('INSERT INTO agent_task_evidence(task_id,at,label,url,note,source) VALUES(?,?,?,?,?,?)', (task['id'], now, label, url, note, source))
     c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
     log(c, now, task['id'], 'evidence', source, actor_for(c, task, source), to_value=label, note=url or note)
-    event(c, now, f'Output evidence recorded ({SOURCE_LABELS[source]}) — link not fetched or verified')
+    event(c, now, f'Output evidence recorded ({SOURCE_LABELS[source]}) — link not fetched or verified, no agent contacted')
     return 201, {'ok': True}
 
 
@@ -333,7 +348,7 @@ def review_task(c, now, data):
         raise ApiError('This task changed since you opened it. Reload it and try again.', 409)
     log(c, now, task['id'], 'review', 'manual', 'You', 'review', 'pending', state, note)
     log(c, now, task['id'], 'status', 'manual', 'You', 'status', 'awaiting_review', new, 'Approved by you' if decision == 'approve' else 'Rejected: sent back to the queue')
-    event(c, now, f'Output {"approved" if decision == "approve" else "rejected"} by you — decision recorded locally')
+    event(c, now, f'Output {"approved" if decision == "approve" else "rejected"} by you — decision recorded locally, no agent contacted')
     return 200, {'ok': True}
 
 
@@ -347,29 +362,34 @@ def _ref_part(data, key, pattern, required=True):
 def link_task(c, now, data):
     """Record that a local task corresponds to a record in a system that owns that record.
     Nothing is written to that system, and the task's own status is not overwritten by it."""
-    strict(data, ('id', 'provider', 'external_id', 'instance', 'scope', 'url', 'label'))
+    strict(data, ('id', 'provider', 'external_id', 'scope', 'context', 'url', 'label'))
     task = load_task(c, data)
     provider = choice(data, 'provider', PROVIDERS, None)
     external_id = _ref_part(data, 'external_id', REF_ID)
     label = field(data, 'label', 120)
     if provider == 'hermes_kanban':
-        if 'instance' in data or 'scope' in data:
-            raise ApiError('Hermes links take their board and profile from the last read, not from the request.')
+        if 'scope' in data or 'context' in data or 'url' in data:
+            raise ApiError('Hermes links take their board and instance from the last successful read, not from the request.')
         meta = _kanban_meta(c)
-        if not meta['snapshot_pinned'] or not meta['snapshot_board'] or not meta['instance']:
+        if not meta['snapshot_pinned'] or not meta['snapshot_board'] or not meta['snapshot_instance']:
             raise ApiError('Pin a board (KEYSTAL_OS_KANBAN_BOARD) and refresh before linking cards: a card id is only unique within its board.', 409)
         card = c.execute('SELECT title FROM kanban_snapshot WHERE external_id=?', (external_id,)).fetchone()
         if not card:
+            if meta['truncated']:
+                raise ApiError(f"That card is not among the {meta['stored']} records stored from the last read, which was TRUNCATED ({meta['dropped']} more were not stored). Refreshing will not help until the board is smaller.", 404)
             raise ApiError('That card is not in the last successful Hermes read. Refresh the board and try again.', 404)
         if task['agent_id'] not in (None, 'hermes'):
             raise ApiError('Hermes Kanban cards can only be linked to tasks assigned to Hermes.', 409)
-        instance, scope, url, label = meta['instance'], meta['snapshot_board'], '', label or card['title'][:120]
+        instance, scope, context, url = meta['snapshot_instance'], meta['snapshot_board'], '', ''
     else:
-        instance, scope = _ref_part(data, 'instance', ID_PART), _ref_part(data, 'scope', ID_PART)
+        # A ClickUp task id is unique within its workspace and a task can sit in several lists, so the list is
+        # context, not identity: one ClickUp task maps to one local task whichever list it was found in.
+        instance, scope = CLICKUP_INSTANCE, _ref_part(data, 'scope', ID_PART)
+        context = _ref_part(data, 'context', ID_PART, required=False)
         url = evidence_url(data.get('url'))
     try:
-        c.execute('INSERT INTO external_refs(task_id,provider,instance,scope,external_id,url,label,source,created) VALUES(?,?,?,?,?,?,?,?,?)',
-                  (task['id'], provider, instance, scope, external_id, url, label, 'manual', now))
+        c.execute('INSERT INTO external_refs(task_id,provider,instance,scope,external_id,context,url,label,source,created) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                  (task['id'], provider, instance, scope, external_id, context, url, label, 'manual', now))
     except sqlite3.IntegrityError:
         raise ApiError('That external record is already linked to a task.', 409)
     if provider == 'hermes_kanban' and task['agent_id'] is None:
@@ -377,7 +397,7 @@ def link_task(c, now, data):
         log(c, now, task['id'], 'assigned', 'manual', 'You', 'agent', 'Unassigned', 'Hermes', 'Assigned to Hermes by linking a Hermes Kanban card')
     c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
     log(c, now, task['id'], 'edited', 'manual', 'You', 'link', None, f'{provider}:{instance}/{scope}/{external_id}', 'Link recorded here only; nothing was changed in the other system')
-    event(c, now, f'Task linked to a {"Hermes Kanban card" if provider == "hermes_kanban" else "ClickUp task"} — nothing changed in that system')
+    event(c, now, f'Task linked to a {"Hermes Kanban card" if provider == "hermes_kanban" else "ClickUp task"} — no agent contacted, nothing changed in that system')
     return 201, {'ok': True}
 
 
@@ -393,7 +413,7 @@ def unlink_task(c, now, data):
     c.execute('DELETE FROM external_refs WHERE id=?', (ref_id,))
     c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
     log(c, now, task['id'], 'edited', 'manual', 'You', 'link', f"{ref['provider']}:{ref['instance']}/{ref['scope']}/{ref['external_id']}", None, 'Link removed here only; nothing was changed in the other system')
-    event(c, now, 'Task link removed — nothing changed in the other system')
+    event(c, now, 'Task link removed — no agent contacted, nothing changed in the other system')
     return 200, {'ok': True}
 
 
@@ -415,7 +435,7 @@ def add_session(c, now, data):
         raise ApiError('That session is already recorded on this task.', 409)
     c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
     log(c, now, task['id'], 'edited', source, actor_for(c, task, source), 'session', None, f'{agent_id}:{session_ref}' + (f'#{run_ref}' if run_ref else ''), note)
-    event(c, now, f'Session identifier recorded ({SOURCE_LABELS[source]}) — nothing was contacted')
+    event(c, now, f'Session identifier recorded ({SOURCE_LABELS[source]}) — no agent contacted')
     return 201, {'ok': True}
 
 
@@ -449,7 +469,7 @@ def sweep_stale(c, now_iso):
             cur = c.execute("UPDATE agent_tasks SET status='stale',status_source='observed',status_changed=? WHERE id=? AND status='running' AND updated=?", (now_iso, row['id'], row['updated']))
             if cur.rowcount == 1:
                 log(c, now_iso, row['id'], 'status', 'observed', 'Keystal OS', 'status', 'running', 'stale', f'No update recorded for {int(idle.total_seconds() // 3600)}h (limit {hours:g}h). Flagged by this server; the agent may still be working.')
-                event(c, now_iso, 'A running task has had no update — flagged stale by this server')
+                event(c, now_iso, 'A running task has had no update — flagged stale by this server, no agent contacted')
 
 
 # --------------------------------------------------------------------- reads
@@ -457,7 +477,8 @@ def sweep_stale(c, now_iso):
 def list_tasks(c):
     rows = c.execute('''SELECT t.*, a.name AS agent_name, p.name AS project,
         (SELECT COUNT(*) FROM agent_task_evidence e WHERE e.task_id=t.id) AS evidence_count,
-        (SELECT COUNT(*) FROM external_refs r WHERE r.task_id=t.id) AS link_count
+        (SELECT COUNT(*) FROM external_refs r WHERE r.task_id=t.id) AS link_count,
+        (t.status='completed' AND t.requires_review=1 AND (t.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=t.id))) AS completed_without_approval
         FROM agent_tasks t LEFT JOIN agents a ON a.id=t.agent_id LEFT JOIN projects p ON p.id=t.project_id
         ORDER BY t.updated DESC, t.created DESC''').fetchall()
     return [dict(r) for r in rows]
@@ -481,14 +502,17 @@ def task_detail(c, tid):
     for r in c.execute('SELECT * FROM external_refs WHERE task_id=? ORDER BY id', (tid,)):
         ref = dict(r)
         if r['provider'] == 'hermes_kanban':
-            same_board = meta['snapshot_pinned'] and meta['snapshot_board'] == r['scope'] and meta['instance'] == r['instance']
+            same_board = meta['snapshot_pinned'] and meta['snapshot_board'] == r['scope'] and meta['snapshot_instance'] == r['instance']
             card = c.execute('SELECT external_id,title,status_raw,status,state_class,assignee,updated_raw FROM kanban_snapshot WHERE external_id=?', (r['external_id'],)).fetchone() if same_board else None
             ref['board_record'] = {'comparable': bool(same_board), 'in_last_read': bool(card), 'last_success_at': meta['last_success_at'], 'snapshot_board': meta['snapshot_board'],
+                                   'snapshot_truncated': bool(meta['truncated']), 'snapshot_dropped': meta['dropped'],
                                    'record': dict(card) if card else None,
                                    'drift': bool(card and card['status'] and card['status'] != row['status'])}
         refs.append(ref)
+    task = dict(row)
+    task['completed_without_approval'] = bool(row['status'] == 'completed' and row['requires_review'] and (row['review_state'] != 'approved' or not c.execute('SELECT 1 FROM agent_task_evidence WHERE task_id=?', (tid,)).fetchone()))
     return {
-        'task': dict(row),
+        'task': task,
         'history': [dict(r) for r in c.execute('SELECT * FROM agent_task_history WHERE task_id=? ORDER BY id', (tid,))],
         'evidence': [dict(r) for r in c.execute('SELECT * FROM agent_task_evidence WHERE task_id=? ORDER BY id', (tid,))],
         'refs': refs,
@@ -511,7 +535,7 @@ def export_rows(c):
 # ------------------------------------------------------------ Hermes Kanban
 
 _KANBAN_DEFAULTS = {'last_attempt_at': None, 'last_attempt_status': 'unchecked', 'last_attempt_detail': 'Not checked yet. Use Refresh to read the Hermes Kanban board.',
-                    'last_success_at': None, 'attempt_board': None, 'snapshot_board': None, 'snapshot_pinned': False, 'instance': None,
+                    'last_success_at': None, 'attempt_board': None, 'attempt_instance': None, 'snapshot_board': None, 'snapshot_pinned': False, 'snapshot_instance': None,
                     'received': 0, 'rejected': 0, 'archived_skipped': 0, 'duplicates': 0, 'unique': 0, 'stored': 0, 'dropped': 0, 'truncated': False,
                     'state_counts': {}, 'status_counts': {}, 'class_counts': {}}
 
@@ -523,7 +547,11 @@ def _kanban_meta(c):
         return dict(_KANBAN_DEFAULTS)
     raw = json.loads(row['value'])
     if 'last_attempt_at' in raw:
-        return {**_KANBAN_DEFAULTS, **raw}
+        meta = {**_KANBAN_DEFAULTS, **raw}
+        if 'instance' in raw and not raw.get('snapshot_instance'):  # interim shape: one 'instance' key for both
+            meta['snapshot_instance'] = raw['instance'] if raw.get('last_success_at') else None
+        meta.pop('instance', None)
+        return meta
     ok = raw.get('status') == 'connected'
     count = raw.get('count', 0) if ok else 0
     return {**_KANBAN_DEFAULTS, 'last_attempt_at': raw.get('checked_at'), 'last_attempt_status': raw.get('status', 'unchecked'), 'last_attempt_detail': raw.get('detail', ''),
@@ -535,11 +563,16 @@ def kanban_view(c, now_iso):
     sanitized error), the last success (and how old it is), and the snapshot actually displayed."""
     meta = _kanban_meta(c)
     refresh, stale_after = kanban_timing()
-    links = {}
-    if meta['snapshot_pinned'] and meta['instance']:
-        for r in c.execute("SELECT external_id,task_id FROM external_refs WHERE provider='hermes_kanban' AND instance=? AND scope=?", (meta['instance'], meta['snapshot_board'])):
+    links, anywhere = {}, set()
+    if meta['snapshot_pinned'] and meta['snapshot_instance']:
+        for r in c.execute("SELECT external_id,task_id FROM external_refs WHERE provider='hermes_kanban' AND instance=? AND scope=?", (meta['snapshot_instance'], meta['snapshot_board'])):
             links[r['external_id']] = r['task_id']
-    tasks = [{**dict(r), 'linked_task_id': links.get(r['external_id'])} for r in c.execute('SELECT external_id,title,status_raw,status,state_class,assignee,updated_raw,fetched FROM kanban_snapshot ORDER BY rowid')]
+    else:
+        # The board is not pinned, so this snapshot's board is unknown: a card whose id is linked on SOME board may be
+        # that linked card. It is marked ambiguous and not counted, rather than risk counting the same work twice.
+        anywhere = {r['external_id'] for r in c.execute("SELECT external_id FROM external_refs WHERE provider='hermes_kanban'")}
+    tasks = [{**dict(r), 'linked_task_id': links.get(r['external_id']), 'possibly_linked': r['external_id'] in anywhere}
+             for r in c.execute('SELECT external_id,title,status_raw,status,state_class,assignee,updated_raw,fetched FROM kanban_snapshot ORDER BY rowid')]
     age = stale = None
     if meta['last_success_at']:
         age = max(0, int((dt.datetime.fromisoformat(now_iso) - dt.datetime.fromisoformat(meta['last_success_at'])).total_seconds()))
@@ -560,8 +593,9 @@ def kanban_view(c, now_iso):
         'stale_after_seconds': stale_after, 'refresh_seconds': refresh,
         'showing_last_success': bool(meta['last_success_at']) and status != 'connected',
         'board': board, 'counts': counts, 'state_counts': meta['state_counts'], 'status_counts': meta['status_counts'], 'class_counts': meta['class_counts'],
-        'link': {'enabled': bool(pinned and meta['instance'] and meta['last_success_at']),
-                 'reason': None if pinned and meta['instance'] and meta['last_success_at'] else 'Linking needs a pinned board (KEYSTAL_OS_KANBAN_BOARD) and one successful read: a card id is only unique within its board.'},
+        'instance': meta['snapshot_instance'],
+        'link': {'enabled': bool(pinned and meta['snapshot_instance'] and meta['last_success_at']),
+                 'reason': None if pinned and meta['snapshot_instance'] and meta['last_success_at'] else 'Linking needs a pinned board (KEYSTAL_OS_KANBAN_BOARD) and one successful read: a card id is only unique within its board.'},
         'tasks': tasks, 'source': 'observed',
     }
 
@@ -574,7 +608,8 @@ def overview(c, runtime, kanban):
     for r in c.execute('SELECT agent_id,status,COUNT(*) AS n FROM agent_tasks GROUP BY agent_id,status'):
         counts.setdefault(r['agent_id'], {})[r['status']] = r['n']
     last_run = c.execute('SELECT status,created,ended FROM runs ORDER BY created DESC LIMIT 1').fetchone()
-    board_only = [t for t in kanban['tasks'] if not t['linked_task_id']]
+    board_only = [t for t in kanban['tasks'] if not t['linked_task_id'] and not t['possibly_linked']]
+    ambiguous = sum(1 for t in kanban['tasks'] if t['possibly_linked'])
     board_extra = {s: 0 for s in STATUSES}
     for t in board_only:
         if t['status']:
@@ -599,8 +634,9 @@ def overview(c, runtime, kanban):
             card['observation'] = {'working_now': bool(runtime.get('busy')), 'last_chat_run': dict(last_run) if last_run else None}
             card['board'] = {'status': kanban['status'], 'has_snapshot': bool(kanban['tasks']) or kanban['last_success_at'] is not None, 'stale': kanban['stale'], 'age_seconds': kanban['age_seconds'],
                              'tracked_tasks': tracked, 'board_only': len(board_only), 'linked': sum(1 for t in kanban['tasks'] if t['linked_task_id']),
-                             'scheduled': sum(1 for t in board_only if t['state_class'] == 'scheduled'), 'unknown': sum(1 for t in board_only if t['state_class'] == 'unknown'),
-                             'drift': drift, 'truncated': kanban['counts']['truncated']}
+                             'scheduled': sum(1 for t in board_only if t['state_class'] == 'scheduled'), 'unknown': sum(1 for t in board_only if not t['status'] and t['state_class'] != 'scheduled'),
+                             'in_tiles': sum(board_extra[s] for s in ('queued', 'running', 'awaiting_review', 'blocked')), 'done': board_extra['completed'],
+                             'ambiguous': ambiguous, 'drift': drift, 'truncated': kanban['counts']['truncated']}
         else:
             card['connection'] = {'status': 'not_connected', 'label': 'NOT CONNECTED', 'detail': 'No API or adapter. Status comes only from tasks you enter and updates you or the agent report.'}
         card['counts'] = tally
@@ -695,7 +731,7 @@ def store_kanban(c, now, result, board, instance, manual=False):
     unsupported read leaves the last good snapshot and its counts untouched."""
     meta = _kanban_meta(c)
     previous = meta['last_attempt_status']
-    meta.update(last_attempt_at=now, last_attempt_status=result['status'], last_attempt_detail=result['detail'], attempt_board=board, instance=instance)
+    meta.update(last_attempt_at=now, last_attempt_status=result['status'], last_attempt_detail=result['detail'], attempt_board=board, attempt_instance=instance)
     if result['status'] == 'connected':
         rows = result['rows']
         c.execute('DELETE FROM kanban_snapshot')
@@ -707,7 +743,7 @@ def store_kanban(c, now, result, board, instance, manual=False):
             class_counts[r['state_class']] = class_counts.get(r['state_class'], 0) + 1
             if r['status']:
                 status_counts[r['status']] = status_counts.get(r['status'], 0) + 1
-        meta.update(last_success_at=now, snapshot_board=board, snapshot_pinned=bool(board), state_counts=state_counts, status_counts=status_counts, class_counts=class_counts,
+        meta.update(last_success_at=now, snapshot_board=board, snapshot_pinned=bool(board), snapshot_instance=instance, state_counts=state_counts, status_counts=status_counts, class_counts=class_counts,
                     **{k: result[k] for k in ('received', 'rejected', 'archived_skipped', 'duplicates', 'unique', 'stored', 'dropped', 'truncated')})
     c.execute('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)', ('kanban', json.dumps(meta)))
     if manual or previous != result['status']:

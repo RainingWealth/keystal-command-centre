@@ -17,6 +17,8 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="$ROOT/$(basename "$SRC")-$STAMP"
 [ ! -e "$DEST" ] || { echo "Destination exists, refusing: $DEST" >&2; exit 2; }
 umask 077
+# Read-only on the source: git must not even refresh its index or take optional locks.
+export GIT_OPTIONAL_LOCKS=0
 mkdir -p "$DEST"
 git -C "$SRC" status --porcelain=v1 --branch > "$DEST/status.txt"
 git -C "$SRC" rev-parse HEAD > "$DEST/head.txt" 2>/dev/null || echo "(no commits)" > "$DEST/head.txt"

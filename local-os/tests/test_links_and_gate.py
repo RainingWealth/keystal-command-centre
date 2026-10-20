@@ -80,7 +80,8 @@ class StrictFields(Api):
         tid = self.task()
         for path, body in (('status', {'status': 'running', 'review_state': 'approved'}), ('note', {'note': 'x', 'status': 'completed'}),
                            ('evidence', {'label': 'x', 'status': 'completed'}), ('review', {'decision': 'approve', 'status': 'completed'}),
-                           ('link', {'provider': 'clickup', 'instance': 'w', 'scope': 's', 'external_id': 'x', 'task_id': 'other'}),
+                           ('link', {'provider': 'clickup', 'scope': 's', 'external_id': 'x', 'task_id': 'other'}),
+                           ('link', {'provider': 'clickup', 'scope': 's', 'external_id': 'x', 'instance': 'elsewhere'}),
                            ('unlink', {'ref_id': 1, 'task_id': 'other'}), ('session', {'session_ref': 's', 'status': 'completed'})):
             self.assertEqual(self.post(path, {'id': tid, **body})[0], 400, path)
 
@@ -135,7 +136,7 @@ class ApprovalGateEveryWritePath(Api):
 
 
 class ClickUpLinks(Api):
-    GOOD = {'provider': 'clickup', 'instance': 'workspace-1', 'scope': 'list-9', 'external_id': 'abc123'}
+    GOOD = {'provider': 'clickup', 'scope': 'workspace-1', 'context': 'list-9', 'external_id': 'abc123'}
 
     def link(self, tid, **over):
         return self.post('link', {'id': tid, **{**self.GOOD, **over}})
@@ -146,7 +147,7 @@ class ClickUpLinks(Api):
         self.assertEqual(code, 201)
         d = self.detail(tid)
         ref = d['refs'][0]
-        self.assertEqual((ref['provider'], ref['instance'], ref['scope'], ref['external_id'], ref['source'], ref['url'], ref['label']), ('clickup', 'workspace-1', 'list-9', 'clk-1', 'manual', 'https://app.clickup.com/t/clk-1', 'Quarterly report'))
+        self.assertEqual((ref['provider'], ref['instance'], ref['scope'], ref['context'], ref['external_id'], ref['source'], ref['url'], ref['label']), ('clickup', 'app.clickup.com', 'workspace-1', 'list-9', 'clk-1', 'manual', 'https://app.clickup.com/t/clk-1', 'Quarterly report'))
         self.assertNotIn('board_record', ref)
         self.assertIn(('edited', 'link'), [(h['kind'], h['field']) for h in d['history']])
         self.assertEqual(next(t for t in self.c.state()['agent_tasks'] if t['id'] == tid)['link_count'], 1)
@@ -156,13 +157,13 @@ class ClickUpLinks(Api):
         self.assertEqual(self.link(a, external_id='same-id')[0], 201)
         self.assertEqual(self.link(b, external_id='same-id')[0], 409, 'same provider, instance, scope and id: one record, one task')
         self.assertEqual(self.link(a, external_id='same-id')[0], 409, 'and not twice on the same task')
-        for change in ({'scope': 'list-other'}, {'instance': 'workspace-2'}):
-            self.assertEqual(self.link(b, external_id='same-id', **change)[0], 201, change)
+        self.assertEqual(self.link(b, external_id='same-id', context='another-list')[0], 409, 'a ClickUp task in two lists is still one task: the list is context, not identity')
+        self.assertEqual(self.link(b, external_id='same-id', scope='workspace-2')[0], 201, 'a different workspace is a different record')
 
     def test_validation(self):
         tid = self.task()
-        for bad in ({'provider': 'jira'}, {'instance': ''}, {'instance': 'has space'}, {'scope': "x'; DROP"}, {'external_id': ''}, {'external_id': 'a' * 129},
-                    {'url': 'javascript:alert(1)'}, {'url': 'https://u:p@app.clickup.com/x'}, {'instance': 'a' * 65}, {'label': 'S1234567D'}):
+        for bad in ({'provider': 'jira'}, {'scope': ''}, {'context': 'has space'}, {'scope': "x'; DROP"}, {'external_id': ''}, {'external_id': 'a' * 129},
+                    {'url': 'javascript:alert(1)'}, {'url': 'https://u:p@app.clickup.com/x'}, {'scope': 'a' * 65}, {'label': 'S1234567D'}, {'instance': 'my-own'}):
             self.assertEqual(self.link(tid, **bad)[0], 400, bad)
         self.assertEqual(self.detail(tid)['refs'], [])
 
@@ -186,6 +187,7 @@ class HermesLinks(Api):
         tid = self.task(agent_id='')
         self.assertEqual(self.post('link', {'id': tid, 'provider': 'hermes_kanban', 'external_id': 't_002', 'scope': 'other'})[0], 400)
         self.assertEqual(self.post('link', {'id': tid, 'provider': 'hermes_kanban', 'external_id': 't_002', 'instance': 'elsewhere'})[0], 400)
+        self.assertEqual(self.post('link', {'id': tid, 'provider': 'hermes_kanban', 'external_id': 't_002', 'context': 'x'})[0], 400)
         self.assertEqual(self.post('link', {'id': tid, 'provider': 'hermes_kanban', 'external_id': 'not-a-card'})[0], 404)
         self.assertEqual(self.post('link', {'id': tid, 'provider': 'hermes_kanban', 'external_id': 't_002'})[0], 201)
         d = self.detail(tid)
@@ -241,13 +243,98 @@ class Sessions(Api):
 class Export(Api):
     def test_export_includes_the_new_tables_and_no_secrets(self):
         tid = self.task(project='Synthetic Export')
-        self.post('link', {'id': tid, 'provider': 'clickup', 'instance': 'w', 'scope': 's', 'external_id': 'exp-1'})
+        self.post('link', {'id': tid, 'provider': 'clickup', 'scope': 's', 'external_id': 'exp-1'})
         self.post('session', {'id': tid, 'session_ref': 'exp-session'})
         export = self.c.request('/api/export')[1]
         for key in ('projects', 'external_refs', 'agent_task_sessions'):
             self.assertTrue(export[key], key)
         self.assertNotIn('csrf', export)
         self.assertNotIn('kanban', export, 'a copy of the Hermes board is not part of the workspace export')
+
+
+class IdempotentCreate(Api):
+    def test_a_retried_create_returns_the_first_task_never_a_second(self):
+        body = {'title': 'Synthetic once', 'agent_id': 'claude', 'request_key': 'k' * 20 + 'create-1'}
+        code, first = self.c.post('/api/agent-tasks', body)
+        self.assertEqual(code, 201)
+        code, again = self.c.post('/api/agent-tasks', body)
+        self.assertEqual((code, again['id'], again['replayed']), (200, first['id'], True))
+        self.assertEqual(sum(1 for t in self.c.state()['agent_tasks'] if t['title'] == 'Synthetic once'), 1)
+        self.assertEqual(self.c.post('/api/agent-tasks', {**body, 'title': 'Different'})[0], 409)
+        for bad in ('short', 'x' * 81, 'has space' * 3, 5):
+            self.assertEqual(self.c.post('/api/agent-tasks', {'title': 't', 'request_key': bad})[0], 400, bad)
+
+    def test_a_failed_create_does_not_burn_the_key(self):
+        key = 'k' * 20 + 'create-2'
+        self.assertEqual(self.c.post('/api/agent-tasks', {'title': '', 'request_key': key})[0], 400)
+        self.assertEqual(self.c.post('/api/agent-tasks', {'title': 'Now valid', 'request_key': key})[0], 201)
+
+
+class ActivityLog(Api):
+    def test_every_task_action_line_says_no_agent_was_contacted(self):
+        tid = self.task(agent_id='hermes')
+        self.post('status', {'id': tid, 'status': 'running'})
+        self.post('note', {'id': tid, 'note': 'x', 'source': 'agent_reported'})
+        self.post('evidence', {'id': tid, 'label': 'Output'})
+        self.post('session', {'id': tid, 'session_ref': 'log-session'})
+        self.post('link', {'id': tid, 'provider': 'clickup', 'scope': 'w', 'external_id': 'log-1'})
+        ref = self.detail(tid)['refs'][0]['id']
+        self.post('unlink', {'id': tid, 'ref_id': ref})
+        self.post('status', {'id': tid, 'status': 'awaiting_review'})
+        self.post('review', {'id': tid, 'decision': 'approve'})
+        self.post('update', {'id': tid, 'priority': 'high'})
+        labels = [e['label'] for e in self.c.state()['events'] if e['kind'] == 'agent']
+        self.assertGreaterEqual(len(labels), 10)
+        self.assertEqual([l for l in labels if 'no agent contacted' not in l], [])
+
+
+class PreGateRowsThroughTheServer(unittest.TestCase):
+    def test_migrate_flags_them_and_every_action_on_them_still_works(self):
+        import tempfile
+        from test_migrations import LEGACY_ID, pr_v2_with_pre_gate_row
+        d = Path(tempfile.mkdtemp())
+        pr_v2_with_pre_gate_row(d / 'workbench.sqlite3')
+        s = Server(data=d, args=['--migrate'])
+        s.start()
+        try:
+            c = s.client()
+            task = next(t for t in c.state()['agent_tasks'] if t['id'] == LEGACY_ID)
+            self.assertEqual((task['status'], task['completed_without_approval']), ('completed', 1), 'flagged, not rewritten')
+            self.assertEqual(c.post('/api/agent-tasks/note', {'id': LEGACY_ID, 'note': 'checked'})[0], 201)
+            self.assertEqual(c.post('/api/agent-tasks/evidence', {'id': LEGACY_ID, 'label': 'Found the output'})[0], 201)
+            self.assertEqual(c.post('/api/agent-tasks/update', {'id': LEGACY_ID, 'priority': 'high'})[0], 200)
+            self.assertEqual(c.post('/api/agent-tasks/link', {'id': LEGACY_ID, 'provider': 'clickup', 'scope': 'w', 'external_id': 'legacy'})[0], 201)
+            self.assertEqual(c.post('/api/agent-tasks/update', {'id': LEGACY_ID, 'requires_review': False})[0], 409, 'cannot quietly drop the requirement on a completed task')
+            self.assertEqual(c.post('/api/agent-tasks/status', {'id': LEGACY_ID, 'status': 'queued', 'note': 'Put it through review'})[0], 200)
+            self.assertFalse(next(t for t in c.state()['agent_tasks'] if t['id'] == LEGACY_ID)['completed_without_approval'])
+        finally:
+            s.stop()
+            s.tmp.cleanup()
+
+    def test_the_server_says_so_at_startup(self):
+        import subprocess, tempfile
+        from test_migrations import pr_v2_with_pre_gate_row
+        d = Path(tempfile.mkdtemp())
+        pr_v2_with_pre_gate_row(d / 'workbench.sqlite3')
+        s = Server(data=d, args=['--migrate'])
+        p = subprocess.Popen([sys.executable, str(Path(__file__).resolve().parent.parent / 'server.py'), '--migrate'], env=s.env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        try:
+            line = p.stderr.readline()
+        finally:
+            p.terminate(); p.wait(timeout=10); p.stderr.close(); s.tmp.cleanup()
+        self.assertIn('1 completed task(s) need review but have no approval and evidence', line)
+
+
+class AuthorityWording(unittest.TestCase):
+    def test_no_shipped_text_calls_clickup_the_execution_or_task_authority(self):
+        root = Path(__file__).resolve().parent.parent
+        import re
+        offenders = []
+        for path in [root / 'app.js', root / 'index.html', root / 'server.py', root / 'README.md', *sorted((root / 'docs').glob('*.md'))]:
+            text = path.read_text()
+            for m in re.finditer(r'[^.\n]*ClickUp[^.\n]*(execution authority|task authority)[^.\n]*', text, re.I):
+                offenders.append(f'{path.name}: {m.group(0).strip()[:120]}')
+        self.assertEqual(offenders, [])
 
 
 if __name__ == '__main__':

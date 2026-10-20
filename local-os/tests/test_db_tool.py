@@ -74,7 +74,8 @@ class Inspect(ToolCase):
         c.execute("INSERT INTO agent_tasks(id,title,status,status_source,requires_review,created,updated,status_changed) VALUES('x','t','completed','manual',1,'n','n','n')")
         c.commit(); c.close()
         code, report = run('inspect', '--db', str(self.db))
-        self.assertEqual((code, report['invariants']['completed_without_approval_and_evidence']), (3, 1))
+        self.assertEqual((code, report['invariants']['completed_without_approval_and_evidence']), (0, 1), 'a data condition to flag, not a broken database')
+        self.assertIn('no approval and evidence', report['warnings'][0])
 
     def test_missing_database_is_an_error_not_a_new_file(self):
         with self.assertRaises(SystemExit):

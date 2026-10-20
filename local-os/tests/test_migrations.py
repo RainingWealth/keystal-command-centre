@@ -26,7 +26,7 @@ def legacy_db(path):
     c.close()
 
 
-FROZEN_HASHES = {  # SHA-256 of each shipped migration's statements, as merged in PR #1 (head e0aea41). Never edit a shipped migration.
+FROZEN_HASHES = {  # SHA-256 of each shipped migration's statements as they are in PR #1 head e0aea41 (not merged yet). Never edit a shipped migration.
     1: '43ac9a096b98a50e064d599bf3c2702b8f1f2c70ca5e92fdc9f93018d18d81ce',
     2: '033e4ba47f06179cdd65aacb1b6f2bdcefdb00157f33f2a852853ba3d963db3f',
 }
@@ -389,6 +389,110 @@ class DatabaseInvariants(unittest.TestCase):
     def test_foreign_keys_hold(self):
         with self.assertRaises(sqlite3.IntegrityError):
             self.ref('missing-task')
+
+
+ORIGINAL_INIT_SQL = '''
+        CREATE TABLE IF NOT EXISTS captures(id TEXT PRIMARY KEY,title TEXT NOT NULL,lane TEXT NOT NULL,owner TEXT NOT NULL,due TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'inbox',pinned INTEGER DEFAULT 0,created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS threads(id TEXT PRIMARY KEY,title TEXT NOT NULL,session_id TEXT,created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,role TEXT NOT NULL,body TEXT NOT NULL,created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,status TEXT NOT NULL,created TEXT NOT NULL,ended TEXT,error TEXT,request_key TEXT UNIQUE NOT NULL,payload_hash TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,label TEXT NOT NULL,created TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+        '''  # verbatim from the original server.py init() (commit 3735b38)
+
+
+LEGACY_ID = 'b' * 32  # PR #1 ids are uuid4().hex
+
+
+def pr_v2_with_pre_gate_row(path):
+    """PR #1's own API could do this: create a task without review, complete it, then switch review on."""
+    pr_v2_db(path, with_rows=False)
+    c = sqlite3.connect(path)
+    c.execute("INSERT INTO agent_tasks(id,title,agent_id,status,status_source,review_state,requires_review,created,updated,status_changed) VALUES(?,'Completed before the gate','codex','completed','manual','none',1,'n','n','n')", (LEGACY_ID,))
+    c.commit()
+    c.close()
+
+
+class StructuralConflicts(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self.tmp.name) / 'workbench.sqlite3'
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_a_database_written_by_the_original_server_code_is_not_a_conflict(self):
+        c = sqlite3.connect(self.db)
+        c.executescript(ORIGINAL_INIT_SQL)
+        c.execute("INSERT INTO captures VALUES('c1','Synthetic','Build','QA','','inbox',0,'n')")
+        c.commit(); c.close()
+        self.assertEqual(migrations.plan(self.db)['conflicts'], [])
+        migrations.migrate(self.db)
+        c = sqlite3.connect(self.db)
+        self.assertEqual(c.execute('SELECT title FROM captures').fetchone()[0], 'Synthetic')
+        c.close()
+
+    def test_same_column_names_with_different_types_are_a_conflict(self):
+        c = sqlite3.connect(self.db)
+        for statement in migrations.MIGRATIONS[0][1]:
+            c.execute(statement)
+        c.execute("CREATE TABLE agents(id INTEGER, name TEXT NOT NULL, role TEXT NOT NULL, integration TEXT NOT NULL, position INTEGER NOT NULL, created TEXT NOT NULL)")
+        c.execute("INSERT INTO agents VALUES(1,'Foreign','x','y',1,'n')")
+        c.commit(); c.close()
+        before = file_hash(self.db)
+        conflicts = migrations.plan(self.db)['conflicts']
+        self.assertEqual([x['name'] for x in conflicts], ['agents'])
+        self.assertIn('different types', conflicts[0]['reason'])
+        with self.assertRaises(migrations.ConflictError):
+            migrations.migrate(self.db)
+        self.assertEqual(file_hash(self.db), before)
+
+    def test_same_columns_with_different_constraints_are_a_conflict(self):
+        c = sqlite3.connect(self.db)
+        for statement in migrations.MIGRATIONS[0][1]:
+            c.execute(statement)
+        # Identical column list to migration 2, but without its CHECK constraint on integration.
+        c.execute("CREATE TABLE agents(id TEXT PRIMARY KEY,name TEXT NOT NULL,role TEXT NOT NULL,integration TEXT NOT NULL,position INTEGER NOT NULL,created TEXT NOT NULL)")
+        c.commit(); c.close()
+        conflicts = migrations.plan(self.db)['conflicts']
+        self.assertEqual([x['name'] for x in conflicts], ['agents'])
+        self.assertIn('different constraints', conflicts[0]['reason'])
+
+
+class PreGateRows(unittest.TestCase):
+    """Rows PR #1 could legitimately create that the new gate would reject: tolerated, flagged, never rewritten."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self.tmp.name) / 'workbench.sqlite3'
+        self.addCleanup(self.tmp.cleanup)
+        pr_v2_with_pre_gate_row(self.db)
+
+    def test_plan_reports_it_and_migration_keeps_it_unchanged(self):
+        self.assertEqual(migrations.plan(self.db)['invariants']['completed_without_approval_and_evidence'], 1)
+        migrations.migrate(self.db)
+        c = sqlite3.connect(self.db)
+        self.assertEqual(c.execute("SELECT status,review_state,requires_review FROM agent_tasks WHERE id=?", (LEGACY_ID,)).fetchone(), ('completed', 'none', 1))
+        self.assertEqual(migrations.invariants(c)['completed_without_approval_and_evidence'], 1)
+        c.close()
+
+    def test_bookkeeping_and_reopening_still_work_but_no_new_violation_can_be_made(self):
+        migrations.migrate(self.db)
+        c = sqlite3.connect(self.db)
+        c.execute("PRAGMA foreign_keys=ON")
+        c.execute("UPDATE agent_tasks SET updated='later' WHERE id=?", (LEGACY_ID,))  # a note or evidence bumps this
+        c.execute("INSERT INTO agent_task_evidence(task_id,at,label,source) VALUES(?,'n','Output','manual')", (LEGACY_ID,))
+        c.execute("UPDATE agent_tasks SET updated='later2' WHERE id=?", (LEGACY_ID,))
+        with self.assertRaisesRegex(sqlite3.DatabaseError, 'approved review with evidence'):
+            c.execute("UPDATE agent_tasks SET review_state='pending' WHERE id=?", (LEGACY_ID,))
+        c.execute("UPDATE agent_tasks SET status='queued' WHERE id=?", (LEGACY_ID,))  # reopen
+        with self.assertRaisesRegex(sqlite3.DatabaseError, 'approved review with evidence'):
+            c.execute("UPDATE agent_tasks SET status='completed' WHERE id=?", (LEGACY_ID,))
+        c.close()
+
+    def test_v3_adds_idempotency_and_link_context(self):
+        migrations.migrate(self.db)
+        c = sqlite3.connect(self.db)
+        self.assertIn('context', [r[1] for r in c.execute('PRAGMA table_info(external_refs)')])
+        self.assertEqual([r[1] for r in c.execute('PRAGMA table_info(agent_task_requests)')], ['request_key', 'task_id', 'payload_hash', 'created'])
+        c.close()
 
 
 if __name__ == '__main__':

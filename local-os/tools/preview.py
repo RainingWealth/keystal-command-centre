@@ -8,13 +8,16 @@ synthetic seed data, and a banner in the app saying so. Your real workbench data
 --hermes none  no Hermes at all: Hermes shows NOT FOUND, Kanban NOT CONNECTED
 --hermes real  your real Hermes CLI: the preview then shows YOUR REAL board titles on 127.0.0.1
 
-Prints the URL and the exact commit. Ctrl+C stops it and deletes the throwaway data.
+Saved OS documents come from a throwaway folder holding one synthetic document, never your real
+~/Keystal documents. Prints the URL and the exact commit. Ctrl+C, SIGTERM or SIGHUP stops the server
+and deletes the throwaway data.
 """
 import argparse
 import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -59,7 +62,10 @@ def main(argv=None):
     scratch = Path(tempfile.mkdtemp(prefix='keystal-preview-'))
     os.chmod(scratch, 0o700)
     (scratch / 'kanban.json').write_text(json.dumps(SYNTHETIC_KANBAN))
-    env = {**os.environ, 'KEYSTAL_OS_DATA': str(scratch / 'state'), 'KEYSTAL_OS_PORT': str(args.port), 'KEYSTAL_OS_KANBAN_BOARD': args.board if args.hermes != 'real' or args.board != 'synthetic' else ''}
+    docs = scratch / 'documents'
+    docs.mkdir()
+    (docs / 'Keystal OS.md').write_text('Keystal OS\n\nSynthetic operating manual for the isolated preview. Your real documents are not shown here.\n')
+    env = {**os.environ, 'KEYSTAL_OS_DATA': str(scratch / 'state'), 'KEYSTAL_OS_DOCROOT': str(docs), 'KEYSTAL_OS_PORT': str(args.port), 'KEYSTAL_OS_KANBAN_BOARD': args.board if args.hermes != 'real' or args.board != 'synthetic' else ''}
     label = 'ISOLATED PREVIEW · synthetic data'
     if args.hermes == 'stub':
         env.update(KEYSTAL_OS_HERMES=str(LOCAL_OS / 'tests' / 'fake_hermes.py'), FAKE_HERMES_KANBAN_JSON=str(scratch / 'kanban.json'), FAKE_HERMES_STATE=str(scratch))
@@ -72,6 +78,11 @@ def main(argv=None):
     env['KEYSTAL_OS_PREVIEW_LABEL'] = label
     process = subprocess.Popen([sys.executable, str(LOCAL_OS / 'server.py')], env=env)
     base = f'http://127.0.0.1:{args.port}'
+
+    def stop(signum, frame):
+        raise KeyboardInterrupt
+    for sig in (signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, stop)
     try:
         for _ in range(100):
             try:
@@ -88,7 +99,7 @@ def main(argv=None):
             client = Client(base)
             client.bootstrap()
             seed(client)
-        print(f'\n  Keystal OS isolated preview: {base}/\n  commit: {commit()}\n  data:   {scratch / "state"} (deleted on exit; your real database is not opened)\n  {label}\n  Loopback only: reachable from this computer only. Ctrl+C to stop.\n', flush=True)
+        print(f'\n  Keystal OS isolated preview: {base}/\n  commit: {commit()}\n  data:   {scratch / "state"} (deleted on exit; your real database is not opened)\n  documents: one synthetic document (your real ~/Keystal documents are not shown)\n  {label}\n  Loopback only: reachable from this computer only. Ctrl+C to stop.\n', flush=True)
         process.wait()
     except KeyboardInterrupt:
         pass

@@ -97,7 +97,8 @@ class Pinned(UiCase):
         card = self.page.locator('#agent-overview .agent-card:has(h3:text-is("Hermes"))')
         card.locator('.agent-live small').first.wait_for()
         text = card.inner_text()
-        self.assertIn('Counts include 4 unlinked board records', text)
+        self.assertIn('Includes 4 unlinked board records', text)
+        self.assertIn('3 in the tiles, 1 with an unknown state (not in the tiles)', text, 'every unlinked record is accounted for, including the ones the tiles cannot show')
         self.assertIn('A board state is a record, not proof of a live worker', text)
         self.assertEqual(card.locator('.agent-stats .has').count(), 3)
         self.assertNotIn('Working on a chat turn now', text, 'a board record marked running is not a live worker')
@@ -154,14 +155,14 @@ class Pinned(UiCase):
         self.assertIn('Synthetic Project X', self.card('UI: reference flow').inner_text())
         self.open_task('UI: reference flow')
         click = p.locator('[data-task-form="link-clickup"]')
-        click.locator('input[name="instance"]').fill('workspace-1')
-        click.locator('input[name="scope"]').fill('list-9')
+        click.locator('input[name="scope"]').fill('workspace-1')
+        click.locator('input[name="context"]').fill('list-9')
         click.locator('input[name="external_id"]').fill('abc123')
         click.locator('input[name="url"]').fill('https://app.clickup.com/t/abc123')
         click.locator('button[type="submit"]').click()
         p.locator('#task-dialog .evidence-row', has_text='ClickUp task').wait_for()
         text = p.locator('#task-dialog').inner_text()
-        self.assertIn('workspace-1 / list-9 / abc123', text)
+        self.assertIn('app.clickup.com / workspace-1 / abc123 · list list-9', text)
         self.assertEqual(p.locator('#task-dialog .evidence-row a[rel="noopener noreferrer"]').count(), 1)
         sess = p.locator('[data-task-form="session"]')
         sess.locator('input[name="session_ref"]').fill('sess_01HX')
@@ -248,6 +249,31 @@ class NotConnected(UiCase):
         self.assertNotIn('STALE', text)
         self.assertEqual(panel.locator('.kanban-row').count(), 0)
         self.assertNotIn('received 0', text, 'no read happened, so no counts are claimed')
+
+
+class StaleOnEveryPage(UiCase):
+    server_kwargs = {'extra_env': {'KEYSTAL_OS_KANBAN_STALE_SECONDS': '60', 'KEYSTAL_OS_KANBAN_REFRESH_SECONDS': '0'}}
+
+    def test_connections_page_shows_age_and_stale_not_a_permanent_green_badge(self):
+        import sqlite3
+        import datetime as dt
+        db = sqlite3.connect(self.server.data / 'workbench.sqlite3')
+        meta = json.loads(db.execute("SELECT value FROM meta WHERE key='kanban'").fetchone()[0])
+        old = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=3)).isoformat()
+        meta['last_success_at'] = meta['last_attempt_at'] = old
+        db.execute("UPDATE meta SET value=? WHERE key='kanban'", (json.dumps(meta),))
+        db.commit(); db.close()
+        self.page.reload()
+        self.page.locator('#server-status', has_text='connected').wait_for()
+        self.go('connections')
+        row = self.page.locator('#connection-list .connection-row', has_text='Hermes Kanban')
+        text = row.inner_text()
+        self.assertIn('CONNECTED · DATA STALE', text)
+        self.assertIn('Last successful read 3h ago', text)
+        self.assertIn('not proof of a live worker', text)
+        self.assertNotIn('CONNECTED · READ-ONLY', text)
+        self.go('agents')
+        self.assertIn('STALE', self.page.locator('#kanban-panel').inner_text())
 
 
 if __name__ == '__main__':

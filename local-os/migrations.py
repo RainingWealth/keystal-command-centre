@@ -10,6 +10,7 @@ refused before anything is written. `CREATE TABLE IF NOT EXISTS` is not reconcil
 import datetime as dt
 import os
 from pathlib import Path
+import re
 import sqlite3
 
 STATUSES = "'queued','running','awaiting_review','blocked','failed','paused','completed','stale'"
@@ -93,11 +94,14 @@ MIGRATIONS = [
             instance TEXT NOT NULL CHECK(length(instance)>0),
             scope TEXT NOT NULL CHECK(length(scope)>0),
             external_id TEXT NOT NULL CHECK(length(external_id)>0),
+            context TEXT NOT NULL DEFAULT '',
             url TEXT NOT NULL DEFAULT '',
             label TEXT NOT NULL DEFAULT '',
             source TEXT NOT NULL CHECK(source IN ({SOURCES})),
             created TEXT NOT NULL,
             UNIQUE(provider,instance,scope,external_id))""",
+        # Idempotent task creation: a retried or double-submitted create returns the first task, never a second one.
+        "CREATE TABLE agent_task_requests(request_key TEXT PRIMARY KEY CHECK(length(request_key) BETWEEN 16 AND 80),task_id TEXT NOT NULL REFERENCES agent_tasks(id),payload_hash TEXT NOT NULL,created TEXT NOT NULL)",
         "CREATE INDEX external_refs_task ON external_refs(task_id)",
         "CREATE TRIGGER external_refs_immutable BEFORE UPDATE ON external_refs BEGIN SELECT RAISE(ABORT,'a link cannot be edited; unlink and link again'); END",
         # Opaque identifiers an agent's own system gave to the work (session / run). Never transcripts.
@@ -120,7 +124,10 @@ MIGRATIONS = [
         # The approval gate lives in the database so that no write path (API, import, hook, manual SQL)
         # can complete a review-required task without an approved review and at least one evidence item.
         "CREATE TRIGGER agent_tasks_completion_gate_insert BEFORE INSERT ON agent_tasks WHEN NEW.status='completed' AND NEW.requires_review=1 BEGIN SELECT RAISE(ABORT,'completion needs an approved review with evidence'); END",
-        "CREATE TRIGGER agent_tasks_completion_gate_update BEFORE UPDATE ON agent_tasks WHEN NEW.status='completed' AND NEW.requires_review=1 AND (NEW.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=NEW.id)) BEGIN SELECT RAISE(ABORT,'completion needs an approved review with evidence'); END",
+        # An UPDATE may not CREATE an unapproved completion. A row that was already in that state before this gate
+        # existed (schema v2 let the owner switch review on after completing) keeps working for notes, evidence and
+        # reopening; it is flagged in the UI and by db_tool, never silently rewritten.
+        "CREATE TRIGGER agent_tasks_completion_gate_update BEFORE UPDATE ON agent_tasks WHEN NEW.status='completed' AND NEW.requires_review=1 AND (NEW.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=NEW.id)) AND NOT (OLD.status='completed' AND OLD.requires_review=1 AND OLD.review_state IS NEW.review_state) BEGIN SELECT RAISE(ABORT,'completion needs an approved review with evidence'); END",
         "CREATE TRIGGER agent_tasks_approved_only_when_completed_insert BEFORE INSERT ON agent_tasks WHEN NEW.review_state='approved' AND NEW.status!='completed' BEGIN SELECT RAISE(ABORT,'an approved review belongs to a completed task'); END",
         "CREATE TRIGGER agent_tasks_approved_only_when_completed_update BEFORE UPDATE ON agent_tasks WHEN NEW.review_state='approved' AND NEW.status!='completed' BEGIN SELECT RAISE(ABORT,'an approved review belongs to a completed task'); END",
     ]),
@@ -137,8 +144,37 @@ class ConflictError(RuntimeError):
 
 
 def _user_tables(c):
-    return {r[0]: [x[1] for x in c.execute(f'PRAGMA table_info("{r[0]}")')]
+    return {r[0]: [x[1] for x in c.execute(f'PRAGMA table_info("{_q(r[0])}")')]
             for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")}
+
+
+def _q(name):
+    return name.replace('"', '""')
+
+
+def _norm_sql(sql):
+    """Compare CREATE TABLE text ignoring case, whitespace and IF NOT EXISTS (the original app used IF NOT EXISTS)."""
+    sql = re.sub(r'\s+', ' ', (sql or '').lower()).replace('if not exists ', '')
+    return re.sub(r'\s*([(),=])\s*', r'\1', sql).strip()
+
+
+def _shapes(c):
+    """Full structure per table: ordered (name, type, notnull, default, pk) plus normalised CREATE text (CHECKs, UNIQUE, REFERENCES)."""
+    out = {}
+    for name, sql in c.execute("SELECT name,sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"):
+        cols = [(x[1], (x[2] or '').upper(), x[3], x[4], x[5]) for x in c.execute(f'PRAGMA table_info("{_q(name)}")')]
+        out[name] = {'columns': cols, 'sql': _norm_sql(sql)}
+    return out
+
+
+def _differs(a, b):
+    if [x[0] for x in a['columns']] != [x[0] for x in b['columns']]:
+        return 'different columns'
+    if a['columns'] != b['columns']:
+        return 'same column names but different types, NOT NULL, defaults or primary key'
+    if a['sql'] != b['sql']:
+        return 'same columns but different constraints (CHECK, UNIQUE or REFERENCES)'
+    return None
 
 
 def _objects(c):
@@ -146,26 +182,27 @@ def _objects(c):
 
 
 def declared(upto):
-    """Tables (name -> columns) and index/trigger names (name -> table) that migrations 1..upto declare."""
+    """Table shapes (name -> shape) and index/trigger names (name -> table) that migrations 1..upto declare."""
     mem = sqlite3.connect(':memory:', isolation_level=None)
     try:
         for _, statements in MIGRATIONS[:upto]:
             for statement in statements:
                 mem.execute(statement)
-        return _user_tables(mem), {k: v[1] for k, v in _objects(mem).items()}
+        return _shapes(mem), {k: v[1] for k, v in _objects(mem).items()}
     finally:
         mem.close()
 
 
 def _conflicts(c, current):
-    live_tables, live_objects = _user_tables(c), _objects(c)
+    live, live_objects = _shapes(c), _objects(c)
+    names = lambda shape: [x[0] for x in shape['columns']] if shape else None
     conflicts = []
     now_tables, _ = declared(current)
-    for name, cols in now_tables.items():
-        if name not in live_tables:
-            conflicts.append({'name': name, 'reason': f'table expected at schema v{current} is missing', 'live_columns': None, 'declared_columns': cols})
-        elif set(live_tables[name]) != set(cols):
-            conflicts.append({'name': name, 'reason': f'table does not have the shape schema v{current} declares', 'live_columns': live_tables[name], 'declared_columns': cols})
+    for name, shape in now_tables.items():
+        if name not in live:
+            conflicts.append({'name': name, 'reason': f'table expected at schema v{current} is missing', 'live_columns': None, 'declared_columns': names(shape)})
+        elif _differs(live[name], shape):
+            conflicts.append({'name': name, 'reason': f'table does not match schema v{current}: {_differs(live[name], shape)}', 'live_columns': names(live[name]), 'declared_columns': names(shape)})
     seen = set(now_tables)
     for version in range(current + 1, LATEST + 1):
         tables, objects = declared(version)
@@ -174,14 +211,26 @@ def _conflicts(c, current):
             if name in before_tables or name in seen:
                 continue
             seen.add(name)
-            if name in live_tables and set(live_tables[name]) != set(tables[name]):
-                conflicts.append({'name': name, 'reason': f'a table named {name} already exists with different columns; migration {version} would skip or break on it', 'live_columns': live_tables[name], 'declared_columns': tables[name]})
+            if name in live and _differs(live[name], tables[name]):
+                conflicts.append({'name': name, 'reason': f'a table named {name} already exists ({_differs(live[name], tables[name])}); migration {version} would skip or break on it', 'live_columns': names(live[name]), 'declared_columns': names(tables[name])})
         for name, owner in objects.items():
             if name in before_objects:
                 continue
-            if name in live_objects and not (owner in live_tables and live_objects[name][1] == owner and set(live_tables.get(owner, [])) == set(tables.get(owner, []))):
+            if name in live_objects and not (owner in live and live_objects[name][1] == owner and not _differs(live[owner], tables[owner])):
                 conflicts.append({'name': name, 'reason': f'an index or trigger named {name} already exists (on {live_objects[name][1]})', 'live_columns': None, 'declared_columns': None})
     return conflicts
+
+
+def invariants(c):
+    """Data conditions worth flagging. A completed, review-required task without an approved review and evidence can
+    exist only from before the database gate (schema v2 allowed switching review on after completion) or a bypass."""
+    tables = _user_tables(c)
+    out = {}
+    if 'agent_tasks' in tables and 'agent_task_evidence' in tables:
+        out['completed_without_approval_and_evidence'] = c.execute("""SELECT COUNT(*) FROM agent_tasks t WHERE t.status='completed' AND t.requires_review=1
+            AND (t.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=t.id))""").fetchone()[0]
+    out['foreign_key_violations'] = len(c.execute('PRAGMA foreign_key_check').fetchall())
+    return out
 
 
 def plan(db):
@@ -194,7 +243,8 @@ def plan(db):
         current = c.execute('PRAGMA user_version').fetchone()[0]
         has_data = bool(_user_tables(c))
         conflicts = _conflicts(c, current) if current <= LATEST else []
-        return {'exists': True, 'current': current, 'latest': LATEST, 'pending': max(LATEST - current, 0), 'has_data': has_data, 'conflicts': conflicts, 'newer_than_code': current > LATEST}
+        return {'exists': True, 'current': current, 'latest': LATEST, 'pending': max(LATEST - current, 0), 'has_data': has_data, 'conflicts': conflicts,
+                'newer_than_code': current > LATEST, 'invariants': invariants(c)}
     finally:
         c.close()
 

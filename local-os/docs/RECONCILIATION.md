@@ -7,7 +7,7 @@
 **Canonical workspace:** `/Users/RayVern/Keystal/keystal-command-centre` (clean on `main`), on the PR #1 branch.
 **Canonical implementation:** the PR foundation (`agent_tasks.py`, `migrations.py`).
 
-Reasons that do not depend on seeing the other code: it has the migration framework and conflict detection, a database-level approval gate, 172 automated tests (the alternative has 6, and its direct creation with status `completed` bypasses approval), and its Kanban adapter has been run against the real Hermes CLI (31 records parsed).
+Reasons that do not depend on seeing the other code: it has the migration framework and conflict detection, a database-level approval gate, 172 automated tests (the alternative has 6, and its direct creation with status `completed` bypasses approval), and Keystal reported that the PR #1 Kanban adapter parsed a real `hermes kanban list --json` response on the Mac (31 records). That run used the earlier adapter; it has to be repeated on this commit with `tools/probe_hermes_kanban.py`.
 
 ## Step 1: preserve the other workspace (read-only on the source)
 
@@ -39,6 +39,10 @@ python3 local-os/tools/db_tool.py backup  --db <path>        # online backup, ve
 python3 local-os/tools/db_tool.py restore-test --backup <file> --db <path>   # restores into scratch, dry-runs the migration
 python3 local-os/tools/db_tool.py migrate-check --db <path>  # migrates a COPY, proves no row is lost
 ```
+
+Default backups land in `backups/` next to the database, on the same disk. Keep a second copy elsewhere: `db_tool.py backup --db <path> --out /Volumes/<external drive>/keystal-backups`.
+
+If `inspect` or `migrate-check` warns about completed tasks without approval and evidence, those were completed before the approval gate (PR #1 allowed switching review on after completion). Migration keeps them as recorded and flags them; reopen any you want reviewed.
 
 The server will not migrate an existing database on its own. Activation is explicit: `python3 local-os/server.py --migrate` (a backup is taken first). Without the flag it exits with these steps and changes nothing.
 

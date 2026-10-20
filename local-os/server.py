@@ -38,7 +38,7 @@ HERMES_INSTANCE = os.environ.get('KEYSTAL_OS_HERMES_INSTANCE', 'local').strip()
 PREVIEW_LABEL = os.environ.get('KEYSTAL_OS_PREVIEW_LABEL', '').strip()[:80]
 BUSY = threading.Lock()
 KANBAN_BUSY = threading.Lock()
-DOCROOT = Path.home() / 'Keystal/outputs/keystal-os'
+DOCROOT = Path(os.environ.get('KEYSTAL_OS_DOCROOT', str(Path.home() / 'Keystal/outputs/keystal-os')))
 DOCS = {
     'manual': ('Operating manual', 'Keystal OS.md', 'Command, routing and decision rights'),
     'tools': ('Tool register', 'Keystal OS - Tool Register.md', 'Which system owns what'),
@@ -53,8 +53,8 @@ AI services, loans, mortgages and other ventures; do not default to insurance.
 This bridge is drafting and public-web research only. No terminal, file-writing, CRM,
 calendar or messaging tools are granted. Never claim to save/send/book/update any external
 record. The web app itself stores this conversation separately. Local captures are draft
-staging, NOT ClickUp tasks. Obsidian/Dropbox is knowledge; ClickUp is task authority;
-Airtable is CRM. Do not invent pipeline figures, tasks, deadlines, connectivity or facts.
+staging, NOT ClickUp tasks. Obsidian/Dropbox is knowledge; ClickUp owns business commitments;
+Hermes Kanban owns internal agent execution; Airtable is CRM. Do not invent pipeline figures, tasks, deadlines, connectivity or facts.
 Never send or solicit private client identifiers, health or financial details. Use [CLIENT].
 Do not search public web for private client information. Ask for sanitised context instead.
 For missing present-day evidence, use available public research tools or label unchecked.
@@ -96,6 +96,10 @@ def init(migrate_ok=False):
                f'1) python3 local-os/tools/db_tool.py backup --db "{DB}"\n2) python3 local-os/tools/db_tool.py migrate-check --db "{DB}"\n3) start with: python3 local-os/server.py --migrate')
     migrations.migrate(DB)
     with connect() as c:
+        legacy = migrations.invariants(c).get('completed_without_approval_and_evidence', 0)
+        if legacy:
+            print(f'NOTE: {legacy} completed task(s) need review but have no approval and evidence. They predate the approval gate (schema v2 allowed '
+                  'switching review on after completion) and are flagged in the dashboard. Reopen them to put them through review.', file=sys.stderr)
         c.execute("UPDATE runs SET status='interrupted',error='Local server restarted; request was not retried automatically.',ended=? WHERE status='running'", (now(),))
     os.chmod(DB, 0o600)
 

@@ -81,13 +81,16 @@ class Server:
         self.process = None
         (self.control / 'kanban.json').write_text(json.dumps(SYNTHETIC_KANBAN))
         (self.control / 'mode').write_text('ok')
+        self.docs = self.control / 'documents'  # synthetic saved documents: tests never read the owner's real ~/Keystal files
+        self.docs.mkdir()
+        (self.docs / 'Keystal OS.md').write_text('Keystal OS\n\nSynthetic operating manual used only by tests.\n')
 
     @property
     def env(self):
         return {**os.environ, 'KEYSTAL_OS_DATA': str(self.data), 'KEYSTAL_OS_PORT': str(self.port),
                 'KEYSTAL_OS_HERMES': str(FAKE_HERMES) if self.hermes else str(self.control / 'no-such-hermes'),
                 'FAKE_HERMES_KANBAN_JSON': str(self.control / 'kanban.json'), 'FAKE_HERMES_MODE_FILE': str(self.control / 'mode'),
-                'FAKE_HERMES_LOG': str(self.control / 'hermes.log'), 'FAKE_HERMES_STATE': str(self.control), **self.extra_env}
+                'FAKE_HERMES_LOG': str(self.control / 'hermes.log'), 'FAKE_HERMES_STATE': str(self.control), 'KEYSTAL_OS_DOCROOT': str(self.docs), **self.extra_env}
 
     def set_kanban_mode(self, mode):
         (self.control / 'mode').write_text(mode)

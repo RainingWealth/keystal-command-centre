@@ -93,7 +93,8 @@ class Parse(unittest.TestCase):
             self.assertEqual(result['stored'], result['unique'] - result['dropped'])
 
     def test_real_hermes_shape_with_extra_fields_still_parses(self):
-        # The shape seen from a real `hermes kanban list --json`: ids, titles and todo/blocked/done states. Extra fields are ignored.
+        # Modelled on what Keystal reported from a real `hermes kanban list --json` (ids, titles, todo/blocked/done states).
+        # No real sample is committed and the field names are undocumented: the probe tool prints the real ones.
         payload = [{'id': f'abc{i}', 'title': 'Synthetic', 'status': s, 'assignee': 'worker', 'tenant': None, 'priority': 0, 'created_at': 1760000000, 'body': 'x'} for i, s in enumerate(('todo', 'blocked', 'done'))]
         result = agent_tasks.parse_kanban(payload)
         self.assertEqual([r['status'] for r in result['rows']], ['queued', 'blocked', 'completed'])
@@ -343,6 +344,72 @@ class ServerBoardHandling(unittest.TestCase):
             self.assertEqual((v['refresh_seconds'], v['stale_after_seconds'], v['status']), (30, 60, 'connected'))
         with Server(extra_env={'KEYSTAL_OS_KANBAN_REFRESH_SECONDS': '0'}) as s:
             self.assertEqual(s.client().state()['kanban']['refresh_seconds'], 0)
+
+
+class InstanceAndPinChanges(unittest.TestCase):
+    """The snapshot keeps the board and instance it was READ with; a later failed attempt cannot relabel it."""
+
+    def test_a_failed_attempt_under_a_new_instance_does_not_relabel_the_snapshot_or_its_links(self):
+        with Server(extra_env={'KEYSTAL_OS_KANBAN_BOARD': 'ops', 'KEYSTAL_OS_HERMES_INSTANCE': 'local'}) as s:
+            c = s.client()
+            a = c.post('/api/agent-tasks', {'title': 'A', 'agent_id': 'hermes'})[1]['id']
+            self.assertEqual(c.post('/api/agent-tasks/link', {'id': a, 'provider': 'hermes_kanban', 'external_id': 't_002'})[0], 201)
+            s.set_kanban_mode('error')
+            s.extra_env['KEYSTAL_OS_HERMES_INSTANCE'] = 'work'
+            s.restart()
+            c = s.client()
+            view = c.state()['kanban']
+            self.assertEqual((view['status'], view['instance']), ('failed', 'local'), 'the snapshot is still the one read under "local"')
+            self.assertEqual([t['linked_task_id'] for t in view['tasks'] if t['external_id'] == 't_002'], [a], 'the existing link still matches')
+            b = c.post('/api/agent-tasks', {'title': 'B', 'agent_id': 'hermes'})[1]['id']
+            self.assertEqual(c.post('/api/agent-tasks/link', {'id': b, 'provider': 'hermes_kanban', 'external_id': 't_001'})[0], 201)
+            ref = c.request('/api/agent-tasks/' + b)[1]['refs'][0]
+            self.assertEqual((ref['instance'], ref['scope']), ('local', 'ops'), 'a new link records the instance and board the card was actually read from')
+
+    def test_losing_the_pin_never_counts_linked_work_twice(self):
+        with Server(extra_env={'KEYSTAL_OS_KANBAN_BOARD': 'ops'}) as s:
+            c = s.client()
+            a = c.post('/api/agent-tasks', {'title': 'A', 'agent_id': 'hermes'})[1]['id']
+            c.post('/api/agent-tasks/status', {'id': a, 'status': 'running'})
+            c.post('/api/agent-tasks/link', {'id': a, 'provider': 'hermes_kanban', 'external_id': 't_002'})
+            self.assertEqual(c.state()['agents']['agents'][0]['counts']['running'], 1)
+            del s.extra_env['KEYSTAL_OS_KANBAN_BOARD']
+            s.restart()
+            hermes = s.client().state()['agents']['agents'][0]
+            self.assertEqual(hermes['counts']['running'], 1, 'the running card may be the linked task: it is not added again')
+            self.assertEqual((hermes['board']['ambiguous'], hermes['board']['linked']), (1, 0))
+
+    def test_truncation_is_explained_where_it_changes_the_meaning(self):
+        c = db()
+        self.addCleanup(c.close)
+        agent_tasks.store_kanban(c, T0, agent_tasks.parse_kanban([rec(i) for i in range(agent_tasks.KANBAN_MAX_STORED + 5)]), 'ops', 'local')
+        c.commit()
+        c.execute('BEGIN IMMEDIATE')
+        tid = agent_tasks.create_task(c, T0, {'title': 'Tracked', 'agent_id': 'hermes'})[1]['id']
+        c.commit()
+        c.execute('BEGIN IMMEDIATE')
+        with self.assertRaises(agent_tasks.ApiError) as e:
+            agent_tasks.link_task(c, T0, {'id': tid, 'provider': 'hermes_kanban', 'external_id': f't{agent_tasks.KANBAN_MAX_STORED + 2}'})
+        c.rollback()
+        self.assertIn('TRUNCATED', str(e.exception))
+        self.assertIn('Refreshing will not help', str(e.exception))
+        c.execute('BEGIN IMMEDIATE')
+        agent_tasks.link_task(c, T0, {'id': tid, 'provider': 'hermes_kanban', 'external_id': 't5'})
+        c.commit()
+        agent_tasks.store_kanban(c, '2026-10-20T10:01:00+00:00', agent_tasks.parse_kanban([rec(i) for i in range(6, agent_tasks.KANBAN_MAX_STORED + 10)]), 'ops', 'local')
+        c.commit()
+        record = agent_tasks.task_detail(c, tid)['refs'][0]['board_record']
+        self.assertEqual((record['in_last_read'], record['snapshot_truncated']), (False, True), 'a missing card on a truncated read is not reported as gone')
+
+    def test_every_unlinked_record_is_accounted_for_in_the_hermes_breakdown(self):
+        c = db()
+        self.addCleanup(c.close)
+        agent_tasks.store_kanban(c, T0, agent_tasks.parse_kanban([rec(1, 'running'), rec(2, 'todo'), rec(3, 'done'), rec(4, 'scheduled'), rec(5, 'mystery'), rec(6, 'review'), rec(7, 'blocked')]), 'ops', 'local')
+        c.commit()
+        view = agent_tasks.kanban_view(c, T0)
+        b = agent_tasks.overview(c, {'bridge_available': True, 'busy': False}, view)['agents'][0]['board']
+        self.assertEqual((b['in_tiles'], b['done'], b['scheduled'], b['unknown']), (4, 1, 1, 1))
+        self.assertEqual(b['in_tiles'] + b['done'] + b['scheduled'] + b['unknown'], b['board_only'])
 
 
 if __name__ == '__main__':
