@@ -12,10 +12,15 @@ import shutil
 import sqlite3
 import subprocess
 import threading
+import traceback
 import uuid
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
+
+import agent_tasks
+import migrations
+from agent_tasks import ApiError
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('KEYSTAL_OS_DATA', str(Path.home() / 'Keystal/outputs/keystal-os/local-state')))
@@ -25,8 +30,10 @@ DB = DATA / 'workbench.sqlite3'
 PORT = int(os.environ.get('KEYSTAL_OS_PORT', '8766'))
 TOKEN = secrets.token_urlsafe(32)
 CSRF = secrets.token_urlsafe(32)
-HERMES = shutil.which('hermes')
+HERMES = shutil.which(os.environ.get('KEYSTAL_OS_HERMES', 'hermes'))
+KANBAN_BOARD = os.environ.get('KEYSTAL_OS_KANBAN_BOARD', '')
 BUSY = threading.Lock()
+KANBAN_BUSY = threading.Lock()
 DOCROOT = Path.home() / 'Keystal/outputs/keystal-os'
 DOCS = {
     'manual': ('Operating manual', 'Keystal OS.md', 'Command, routing and decision rights'),
@@ -58,18 +65,12 @@ def now():
 def connect():
     c = sqlite3.connect(DB, timeout=15)
     c.row_factory = sqlite3.Row
+    c.execute('PRAGMA foreign_keys=ON')
     return c
 
 def init():
+    migrations.migrate(DB)
     with connect() as c:
-        c.executescript('''
-        CREATE TABLE IF NOT EXISTS captures(id TEXT PRIMARY KEY,title TEXT NOT NULL,lane TEXT NOT NULL,owner TEXT NOT NULL,due TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'inbox',pinned INTEGER DEFAULT 0,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS threads(id TEXT PRIMARY KEY,title TEXT NOT NULL,session_id TEXT,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,role TEXT NOT NULL,body TEXT NOT NULL,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,status TEXT NOT NULL,created TEXT NOT NULL,ended TEXT,error TEXT,request_key TEXT UNIQUE NOT NULL,payload_hash TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,label TEXT NOT NULL,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
-        ''')
         c.execute("UPDATE runs SET status='interrupted',error='Local server restarted; request was not retried automatically.',ended=? WHERE status='running'", (now(),))
     os.chmod(DB, 0o600)
 
@@ -81,6 +82,8 @@ def meta(c, key, value):
 
 def getstate():
     with connect() as c:
+        agent_tasks.sweep_stale(c, now())
+        runtime = {'mode': 'local', 'bridge_available': bool(HERMES), 'busy': BUSY.locked(), 'hosted': False, 'chat_scope': 'Drafting + public web research'}
         return {
             'csrf': CSRF,
             'captures': [dict(r) for r in c.execute('SELECT * FROM captures ORDER BY pinned DESC,created DESC')],
@@ -89,13 +92,28 @@ def getstate():
             'runs': [dict(r) for r in c.execute('SELECT id,thread_id,status,created,ended,error FROM runs ORDER BY created DESC LIMIT 30')],
             'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 80')],
             'checks': {r['key']: json.loads(r['value']) for r in c.execute('SELECT * FROM meta')},
-            'runtime': {'mode': 'local', 'bridge_available': bool(HERMES), 'busy': BUSY.locked(), 'hosted': False, 'chat_scope': 'Drafting + public web research'},
+            'runtime': runtime,
+            'agents': agent_tasks.overview(c, runtime),
+            'agent_tasks': agent_tasks.list_tasks(c),
+            'kanban': agent_tasks.kanban_view(c),
             'documents': [{'id': k, 'title': v[0], 'description': v[2], 'available': (DOCROOT / v[1]).is_file(), 'source': 'Local saved document'} for k, v in DOCS.items()],
             'server_time': now(),
         }
 
-class BadRequest(Exception):
+class BadRequest(ApiError):
     pass
+
+def refresh_kanban():
+    """Read-only refresh of the Hermes Kanban snapshot. Returns the stored meta, or None if one is already running."""
+    if not KANBAN_BUSY.acquire(blocking=False):
+        return None
+    try:
+        board = KANBAN_BOARD if agent_tasks.BOARD.fullmatch(KANBAN_BOARD) else None
+        status, detail, rows = agent_tasks.fetch_kanban(HERMES, board)
+        with connect() as c:
+            return agent_tasks.store_kanban(c, now(), status, detail, rows)
+    finally:
+        KANBAN_BUSY.release()
 
 def text(data, key, maximum, default=None):
     value = data.get(key, default)
@@ -188,9 +206,17 @@ class Handler(BaseHTTPRequestHandler):
             if not doc or not (DOCROOT / doc[1]).is_file():
                 return self.send(404, {'error': 'Document unavailable'})
             return self.send(200, {'title': doc[0], 'content': (DOCROOT / doc[1]).read_text(), 'source': str(DOCROOT / doc[1]), 'scope': 'Saved document, not live source-system state'})
+        if path.startswith('/api/agent-tasks/'):
+            try:
+                with connect() as c:
+                    return self.send(200, agent_tasks.task_detail(c, path.rsplit('/', 1)[-1]))
+            except ApiError as exc:
+                return self.send(exc.status, {'error': str(exc)})
         if path == '/api/export':
             state = getstate()
-            return self.send(200, {k: state[k] for k in ('captures', 'threads', 'messages', 'events', 'server_time')})
+            with connect() as c:
+                agent_data = agent_tasks.export_rows(c)
+            return self.send(200, {**{k: state[k] for k in ('captures', 'threads', 'messages', 'events', 'server_time')}, **agent_data})
         return self.send(404, {'error': 'Not found'})
     def do_POST(self):
         if not self.validhost() or not self.authorised():
@@ -207,11 +233,24 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(data, dict):
                 raise BadRequest('Object required')
             return self.post(urlsplit(self.path).path, data)
-        except (ValueError, BadRequest) as exc:
+        except ApiError as exc:
+            return self.send(exc.status, {'error': str(exc)})
+        except ValueError as exc:
             return self.send(400, {'error': str(exc)})
         except Exception:
+            traceback.print_exc()
             return self.send(500, {'error': 'Local operation failed. No external update claimed.'})
     def post(self, path, data):
+        if path in agent_tasks.ROUTES:
+            with connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                code, payload = agent_tasks.ROUTES[path](c, now(), data)
+            return self.send(code, payload)
+        if path == '/api/kanban/refresh':
+            meta = refresh_kanban()
+            if meta is None:
+                return self.send(409, {'error': 'A Kanban read is already running.'})
+            return self.send(200, meta)
         if path == '/api/captures':
             title = text(data, 'title', 400)
             lane = text(data, 'lane', 30, 'Operate')
@@ -293,6 +332,7 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     init()
+    threading.Thread(target=refresh_kanban, daemon=True).start()
     server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
     print(f'Keystal OS local server: http://127.0.0.1:{PORT}', flush=True)
     print('Loopback only. No cloud deployment. Ctrl+C stops the server.', flush=True)
