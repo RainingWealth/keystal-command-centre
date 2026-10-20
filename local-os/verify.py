@@ -107,6 +107,11 @@ with tempfile.TemporaryDirectory(prefix='keystal-test-',dir=os.environ.get('TMPD
         check('Evidence recorded',client.request('/api/agent-tasks/evidence',{'id':tid,'label':'QA output','url':'https://example.com/qa'})[0]==201)
         check('Approval with evidence completes the task',client.request('/api/agent-tasks/review',{'id':tid,'decision':'approve'})[0]==200)
         check('Agent task history readable',len(client.request('/api/agent-tasks/'+tid)[1]['history'])>=5)
+        check('Status cannot be smuggled into task creation',client.request('/api/agent-tasks',{'title':'QA smuggle — synthetic','status':'completed'})[0]==400)
+        link={'id':tid,'provider':'clickup','instance':'qa-workspace','scope':'qa-list','external_id':'qa-1'}
+        check('External reference recorded',client.request('/api/agent-tasks/link',link)[0]==201)
+        check('Same external record cannot be linked twice',client.request('/api/agent-tasks/link',{**link,'id':client.request('/api/agent-tasks',{'title':'QA second — synthetic'})[1]['id']})[0]==409)
+        check('Session identifier validated',client.request('/api/agent-tasks/session',{'id':tid,'agent_id':'claude','session_ref':'not valid!'})[0]==400 and client.request('/api/agent-tasks/session',{'id':tid,'agent_id':'claude','session_ref':'qa-session-1'})[0]==201)
         check('Export includes agent tasks and no CSRF',any(t['id']==tid for t in client.request('/api/export')[1]['agent_tasks']) and 'csrf' not in client.request('/api/export')[1])
         # Restart the isolated app only; never restart the user's Hermes gateway.
         process.terminate();process.wait(timeout=10);process=start();client=Client();state=client.bootstrap()

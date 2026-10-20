@@ -11,7 +11,9 @@ import secrets
 import shutil
 import sqlite3
 import subprocess
+import sys
 import threading
+import time
 import traceback
 import uuid
 from http.cookies import SimpleCookie
@@ -31,7 +33,9 @@ PORT = int(os.environ.get('KEYSTAL_OS_PORT', '8766'))
 TOKEN = secrets.token_urlsafe(32)
 CSRF = secrets.token_urlsafe(32)
 HERMES = shutil.which(os.environ.get('KEYSTAL_OS_HERMES', 'hermes'))
-KANBAN_BOARD = os.environ.get('KEYSTAL_OS_KANBAN_BOARD', '')
+KANBAN_BOARD = os.environ.get('KEYSTAL_OS_KANBAN_BOARD', '').strip()
+HERMES_INSTANCE = os.environ.get('KEYSTAL_OS_HERMES_INSTANCE', 'local').strip()
+PREVIEW_LABEL = os.environ.get('KEYSTAL_OS_PREVIEW_LABEL', '').strip()[:80]
 BUSY = threading.Lock()
 KANBAN_BUSY = threading.Lock()
 DOCROOT = Path.home() / 'Keystal/outputs/keystal-os'
@@ -68,7 +72,28 @@ def connect():
     c.execute('PRAGMA foreign_keys=ON')
     return c
 
-def init():
+def refuse(message):
+    print(message, file=sys.stderr)
+    sys.exit(2)
+
+def startup_checks():
+    """Fail at startup, never silently fall back: a wrong board or profile would be displayed as the selected one."""
+    if KANBAN_BOARD and not agent_tasks.BOARD.fullmatch(KANBAN_BOARD):
+        refuse(f'KEYSTAL_OS_KANBAN_BOARD={KANBAN_BOARD[:80]!r} is not a valid Hermes board name (lowercase letters, digits, hyphen and underscore; 1-64 characters, starting with a letter or digit). Refusing to start rather than read a different board.')
+    if not agent_tasks.ID_PART.fullmatch(HERMES_INSTANCE):
+        refuse(f'KEYSTAL_OS_HERMES_INSTANCE={HERMES_INSTANCE[:80]!r} is not a valid instance/profile label.')
+
+def init(migrate_ok=False):
+    """Open the database. A database that already holds data is only migrated on an explicit --migrate."""
+    state = migrations.plan(DB)
+    if state.get('newer_than_code'):
+        refuse(f"{DB} is schema v{state['current']}, newer than this Keystal OS (v{state['latest']}). Refusing to open it.")
+    if state['conflicts']:
+        names = ', '.join(sorted({c['name'] for c in state['conflicts']}))
+        refuse(f'{DB} has tables that conflict with this version ({names}), probably from another implementation. Nothing was changed. Run: python3 local-os/tools/db_tool.py inspect --db "{DB}"')
+    if state['pending'] and state['has_data'] and not migrate_ok:
+        refuse(f"{DB} is at schema v{state['current']} and this version needs v{state['latest']}. Nothing was changed.\n"
+               f'1) python3 local-os/tools/db_tool.py backup --db "{DB}"\n2) python3 local-os/tools/db_tool.py migrate-check --db "{DB}"\n3) start with: python3 local-os/server.py --migrate')
     migrations.migrate(DB)
     with connect() as c:
         c.execute("UPDATE runs SET status='interrupted',error='Local server restarted; request was not retried automatically.',ended=? WHERE status='running'", (now(),))
@@ -82,8 +107,10 @@ def meta(c, key, value):
 
 def getstate():
     with connect() as c:
-        agent_tasks.sweep_stale(c, now())
-        runtime = {'mode': 'local', 'bridge_available': bool(HERMES), 'busy': BUSY.locked(), 'hosted': False, 'chat_scope': 'Drafting + public web research'}
+        stamp = now()
+        agent_tasks.sweep_stale(c, stamp)
+        runtime = {'mode': 'local', 'bridge_available': bool(HERMES), 'busy': BUSY.locked(), 'hosted': False, 'chat_scope': 'Drafting + public web research', 'preview_label': PREVIEW_LABEL}
+        kanban = agent_tasks.kanban_view(c, stamp)
         return {
             'csrf': CSRF,
             'captures': [dict(r) for r in c.execute('SELECT * FROM captures ORDER BY pinned DESC,created DESC')],
@@ -93,9 +120,10 @@ def getstate():
             'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 80')],
             'checks': {r['key']: json.loads(r['value']) for r in c.execute('SELECT * FROM meta')},
             'runtime': runtime,
-            'agents': agent_tasks.overview(c, runtime),
+            'agents': agent_tasks.overview(c, runtime, kanban),
             'agent_tasks': agent_tasks.list_tasks(c),
-            'kanban': agent_tasks.kanban_view(c),
+            'projects': agent_tasks.list_projects(c),
+            'kanban': kanban,
             'documents': [{'id': k, 'title': v[0], 'description': v[2], 'available': (DOCROOT / v[1]).is_file(), 'source': 'Local saved document'} for k, v in DOCS.items()],
             'server_time': now(),
         }
@@ -103,17 +131,26 @@ def getstate():
 class BadRequest(ApiError):
     pass
 
-def refresh_kanban():
-    """Read-only refresh of the Hermes Kanban snapshot. Returns the stored meta, or None if one is already running."""
+def refresh_kanban(manual=False):
+    """Read-only refresh of the Hermes Kanban snapshot. Returns the stored read bookkeeping, or None if a read is already running.
+    The configured board is used exactly as named; it is never replaced by a default."""
     if not KANBAN_BUSY.acquire(blocking=False):
         return None
     try:
-        board = KANBAN_BOARD if agent_tasks.BOARD.fullmatch(KANBAN_BOARD) else None
-        status, detail, rows = agent_tasks.fetch_kanban(HERMES, board)
+        board = KANBAN_BOARD or None
+        result = agent_tasks.fetch_kanban(HERMES, board)
         with connect() as c:
-            return agent_tasks.store_kanban(c, now(), status, detail, rows)
+            return agent_tasks.store_kanban(c, now(), result, board, HERMES_INSTANCE, manual)
+    except Exception:
+        traceback.print_exc()
+        return None
     finally:
         KANBAN_BUSY.release()
+
+def kanban_loop(seconds):
+    while True:
+        refresh_kanban()
+        time.sleep(seconds)
 
 def text(data, key, maximum, default=None):
     value = data.get(key, default)
@@ -247,10 +284,10 @@ class Handler(BaseHTTPRequestHandler):
                 code, payload = agent_tasks.ROUTES[path](c, now(), data)
             return self.send(code, payload)
         if path == '/api/kanban/refresh':
-            meta = refresh_kanban()
-            if meta is None:
+            if refresh_kanban(manual=True) is None:
                 return self.send(409, {'error': 'A Kanban read is already running.'})
-            return self.send(200, meta)
+            with connect() as c:
+                return self.send(200, agent_tasks.kanban_view(c, now()))
         if path == '/api/captures':
             title = text(data, 'title', 400)
             lane = text(data, 'lane', 30, 'Operate')
@@ -331,8 +368,12 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(404, {'error': 'Not found'})
 
 if __name__ == '__main__':
-    init()
-    threading.Thread(target=refresh_kanban, daemon=True).start()
+    parser = argparse.ArgumentParser(description='Keystal OS: loopback-only, single-user workbench.')
+    parser.add_argument('--migrate', action='store_true', help='apply pending database migrations to an existing database (a backup is taken first)')
+    args = parser.parse_args()
+    startup_checks()
+    init(args.migrate)
+    threading.Thread(target=kanban_loop, args=(agent_tasks.kanban_timing()[0] or 10**9,), daemon=True).start()
     server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
     print(f'Keystal OS local server: http://127.0.0.1:{PORT}', flush=True)
     print('Loopback only. No cloud deployment. Ctrl+C stops the server.', flush=True)

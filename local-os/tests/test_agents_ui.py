@@ -13,11 +13,13 @@ except ImportError:  # pragma: no cover
 
 
 class UiCase(unittest.TestCase):
+    server_kwargs = {}
+
     @classmethod
     def setUpClass(cls):
         if sync_playwright is None:
             raise unittest.SkipTest('Python Playwright is not installed')
-        cls.server = Server().start()
+        cls.server = Server(**cls.server_kwargs).start()
         cls.pw = sync_playwright().start()
         try:
             cls.browser = cls.pw.chromium.launch()
@@ -83,7 +85,7 @@ class EmptyState(unittest.TestCase):
     def test_fresh_workspace_shows_agents_and_no_invented_activity(self):
         if sync_playwright is None:
             self.skipTest('Python Playwright is not installed')
-        with Server() as server, sync_playwright() as pw:
+        with Server(hermes=False) as server, sync_playwright() as pw:
             try:
                 browser = pw.chromium.launch()
             except Exception as exc:
@@ -95,7 +97,7 @@ class EmptyState(unittest.TestCase):
             self.assertEqual(cards.count(), 5)
             self.assertEqual([t.strip() for t in cards.locator('h3').all_inner_texts()], ['Hermes', 'ChatGPT', 'Claude', 'Codex', 'Gemini'])
             self.assertEqual(page.locator('#agent-overview .agent-card .badge:text-is("NOT CONNECTED")').count(), 4)
-            self.assertEqual(page.locator('#agent-overview .agent-card .badge:text-is("LOCAL CLI DETECTED")').count(), 1)
+            self.assertEqual(page.locator('#agent-overview .agent-card .badge:text-is("HERMES CLI NOT FOUND")').count(), 1)
             self.assertIn('No tasks tracked yet', page.locator('#agent-overview').inner_text())
             self.assertEqual(page.locator('#agent-overview .agent-stats .has').count(), 0, 'every count is zero')
             self.assertEqual(page.locator('#agent-overview .agent-running').count(), 0)
@@ -260,14 +262,17 @@ class KanbanPanel(UiCase):
         text = p.locator('#kanban-panel').inner_text()
         self.assertIn('CONNECTED · READ-ONLY', text)
         self.assertEqual(p.locator('#kanban-panel .kanban-row').count(), 4)
-        self.assertIn('Hermes status: mystery', text)
+        self.assertIn('Hermes state: mystery', text)
         self.assertEqual(p.locator('#kanban-panel .src-observed').count(), 1)
-        self.assertEqual(p.locator('#kanban-panel button, #kanban-panel input, #kanban-panel select, #kanban-panel textarea').count(), 0, 'no controls: the board is read-only')
+        self.assertEqual(p.locator('#kanban-panel select, #kanban-panel input, #kanban-panel textarea').count(), 0, 'no edit controls: the board is read-only')
+        self.assertIn('FRESH', text)
         self.server.set_kanban_mode('missing')
         self.refresh_panel()
-        p.locator('#kanban-panel .kanban-row').first.wait_for(state='detached')
-        self.assertIn('NOT CONNECTED', p.locator('#kanban-panel').inner_text())
-        self.assertNotIn('Synthetic', p.locator('#kanban-panel').inner_text())
+        p.locator('#kanban-panel .badge', has_text='NOT CONNECTED').first.wait_for()
+        panel = p.locator('#kanban-panel').inner_text()
+        self.assertIn('Showing the last successful read', panel)
+        self.assertIn('Synthetic: review outreach copy', panel, 'the last good snapshot is kept, not blanked')
+        self.assertIn('LAST SUCCESSFUL READ', panel)
         self.server.set_kanban_mode('ok')
 
 

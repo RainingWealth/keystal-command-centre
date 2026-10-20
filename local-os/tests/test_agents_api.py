@@ -41,7 +41,7 @@ class ApiCase(unittest.TestCase):
 
 class RegistryAndHonesty(ApiCase):
     def test_five_agents_listed_with_no_invented_activity(self):
-        s = Server(); s.start()
+        s = Server(hermes=False); s.start()
         try:
             state = s.client().state()
             cards = state['agents']['agents']
@@ -52,6 +52,22 @@ class RegistryAndHonesty(ApiCase):
                 self.assertEqual(a['running'], [])
             self.assertEqual(state['agent_tasks'], [])
             self.assertEqual(state['agents']['totals']['running'], 0)
+        finally:
+            s.stop(); s.tmp.cleanup()
+
+    def test_only_observed_board_records_ever_appear_on_a_fresh_workspace(self):
+        # With Hermes present and a Kanban board, the Hermes card shows the board's records (observed) and nothing else.
+        s = Server(); s.start()
+        try:
+            state = s.client().state()
+            cards = {a['id']: a for a in state['agents']['agents']}
+            self.assertEqual(state['agent_tasks'], [])
+            for key in ('chatgpt', 'claude', 'codex', 'gemini'):
+                self.assertEqual(sum(cards[key]['counts'].values()), 0)
+            hermes = cards['hermes']['counts']
+            self.assertEqual((hermes['queued'], hermes['running'], hermes['blocked'], hermes['awaiting_review']), (1, 1, 1, 0))
+            self.assertEqual(cards['hermes']['board']['board_only'], 4)
+            self.assertEqual(cards['hermes']['board']['tracked_tasks'], 0)
         finally:
             s.stop(); s.tmp.cleanup()
 
@@ -128,8 +144,11 @@ class Validation(ApiCase):
         self.assertEqual((t['title'], t['status'], t['status_source'], t['agent_id'], t['priority'], t['requires_review'], t['review_state']), ('Draft a call script', 'queued', 'manual', None, 'normal', 1, 'none'))
 
     def test_unknown_task_is_404(self):
-        for path in ('/api/agent-tasks/status', '/api/agent-tasks/note', '/api/agent-tasks/evidence', '/api/agent-tasks/review', '/api/agent-tasks/update'):
-            self.assertEqual(self.c.post(path, {'id': 'f' * 32, 'status': 'running', 'note': 'x', 'label': 'x', 'decision': 'approve'})[0], 404, path)
+        bodies = {'/api/agent-tasks/status': {'status': 'running'}, '/api/agent-tasks/note': {'note': 'x'}, '/api/agent-tasks/evidence': {'label': 'x'},
+                  '/api/agent-tasks/review': {'decision': 'approve'}, '/api/agent-tasks/update': {'title': 'x'}, '/api/agent-tasks/unlink': {'ref_id': 1},
+                  '/api/agent-tasks/session': {'agent_id': 'codex', 'session_ref': 's1'}, '/api/agent-tasks/link': {'provider': 'clickup', 'instance': 'w', 'scope': 's', 'external_id': 'x'}}
+        for path, body in bodies.items():
+            self.assertEqual(self.c.post(path, {'id': 'f' * 32, **body})[0], 404, path)
 
     def test_edit_records_history_and_reassignment_is_not_dispatch(self):
         tid = self.task()
@@ -167,7 +186,8 @@ class Provenance(ApiCase):
         tid = self.task()
         self.status(tid, 'awaiting_review', source='agent_reported')
         self.c.post('/api/agent-tasks/evidence', {'id': tid, 'label': 'Output', 'source': 'agent_reported'})
-        self.assertEqual(self.c.post('/api/agent-tasks/review', {'id': tid, 'decision': 'approve', 'source': 'agent_reported'})[0], 200)
+        self.assertEqual(self.c.post('/api/agent-tasks/review', {'id': tid, 'decision': 'approve', 'source': 'agent_reported'})[0], 400, 'a review has no source field: it is always the owner')
+        self.assertEqual(self.c.post('/api/agent-tasks/review', {'id': tid, 'decision': 'approve'})[0], 200)
         d = self.detail(tid)
         self.assertEqual(d['task']['status_source'], 'manual')
         self.assertEqual([h['source'] for h in d['history'] if h['kind'] == 'review'], ['manual'])
@@ -266,6 +286,7 @@ class Evidence(ApiCase):
         self.assertEqual(len(self.detail(tid)['evidence']), 2)
 
     def test_evidence_is_recorded_not_fetched(self):
+        self.server.client()  # waits for the startup Kanban read so the call count below is stable
         before = len(self.server.hermes_calls())
         tid = self.task()
         self.c.post('/api/agent-tasks/evidence', {'id': tid, 'label': 'Output', 'url': 'http://127.0.0.1:9/never-fetched'})
@@ -368,14 +389,19 @@ class Overview(ApiCase):
 
 
 class Kanban(ApiCase):
+    def setUp(self):  # the class shares one server: every test starts from the same synthetic board
+        from harness import SYNTHETIC_KANBAN
+        self.server.set_kanban_rows(SYNTHETIC_KANBAN)
+        self.server.set_kanban_mode('ok')
+
     def refresh(self, server=None):
         s = server or self.server
         return s.client().post('/api/kanban/refresh', {})
 
     def test_connected_read_only_and_normalised(self):
         self.server.set_kanban_mode('ok')
-        code, meta = self.refresh()
-        self.assertEqual((code, meta['status'], meta['count']), (200, 'connected', 4))
+        code, view = self.refresh()
+        self.assertEqual((code, view['status'], view['counts']['stored']), (200, 'connected', 4))
         k = self.c.state()['kanban']
         by = {t['external_id']: t for t in k['tasks']}
         self.assertNotIn('t_003', by, 'archived tasks are skipped')
@@ -384,8 +410,8 @@ class Kanban(ApiCase):
         self.assertEqual(by['t_004']['status'], 'blocked')
         self.assertEqual((by['t_005']['status'], by['t_005']['status_raw']), (None, 'mystery'), 'unmapped statuses are shown as Hermes reported them')
         self.assertEqual(k['source'], 'observed')
-        hermes = self.c.state()['agents']['agents'][0]['observation']
-        self.assertEqual((hermes['kanban_status'], hermes['kanban_count']), ('connected', 4))
+        hermes = self.c.state()['agents']['agents'][0]
+        self.assertEqual((hermes['board']['status'], hermes['board']['board_only']), ('connected', 4))
 
     def test_only_read_commands_are_ever_sent_to_hermes(self):
         self.server.set_kanban_mode('ok')
@@ -404,33 +430,41 @@ class Kanban(ApiCase):
 
     def test_empty_board_is_connected_not_an_error(self):
         self.server.set_kanban_rows([])
-        code, meta = self.refresh()
-        self.assertEqual((meta['status'], meta['count']), ('connected', 0))
+        code, view = self.refresh()
+        self.assertEqual((view['status'], view['counts']['stored'], view['counts']['received']), ('connected', 0, 0))
         self.server.set_kanban_rows([{'id': 1, 'title': 'x', 'status': 'todo'}])
-        self.assertEqual(self.refresh()[1]['count'], 1)
+        self.assertEqual(self.refresh()[1]['counts']['stored'], 1)
         self.server.set_kanban_rows({'tasks': [{'task_id': 'a', 'title': 'wrapped', 'status': 'done'}, 'junk', {'title': 'no id', 'status': 'todo'}]})
-        self.assertEqual(self.refresh()[1]['count'], 1)
+        view = self.refresh()[1]
+        self.assertEqual((view['status'], view['counts']['received'], view['counts']['stored'], view['counts']['rejected']), ('connected', 3, 1, 2), 'partly recognised: connected, with the rejects counted')
 
     def test_not_connected_when_this_hermes_has_no_kanban(self):
+        self.server.set_kanban_mode('ok')
+        self.assertEqual(self.refresh()[1]['counts']['stored'], 4)
         self.server.set_kanban_mode('missing')
-        meta = self.refresh()[1]
-        self.assertEqual(meta['status'], 'not_connected')
-        self.assertIn('no Kanban command', meta['detail'])
-        self.assertEqual(self.c.state()['kanban']['tasks'], [], 'a previous snapshot is cleared, not shown as current')
+        view = self.refresh()[1]
+        self.assertEqual(view['status'], 'not_connected')
+        self.assertIn('no Kanban command', view['detail'])
+        self.assertEqual(len(view['tasks']), 4, 'the last good snapshot is kept, and labelled as the last successful read')
+        self.assertTrue(view['showing_last_success'])
+        self.server.set_kanban_mode('ok')
+        self.refresh()
 
     def test_not_connected_when_hermes_is_not_installed(self):
         s = Server(hermes=False); s.start()
         try:
-            meta = s.client().post('/api/kanban/refresh', {})[1]
-            self.assertEqual(meta['status'], 'not_connected')
+            view = s.client().post('/api/kanban/refresh', {})[1]
+            self.assertEqual(view['status'], 'not_connected')
+            self.assertIsNone(view['last_success_at'])
+            self.assertEqual(view['tasks'], [])
             self.assertEqual(s.hermes_calls(), [])
         finally:
             s.stop(); s.tmp.cleanup()
 
     def test_failures_are_reported_without_leaking_stderr(self):
         self.server.set_kanban_mode('error')
-        meta = self.refresh()[1]
-        self.assertEqual(meta['status'], 'failed')
+        view = self.refresh()[1]
+        self.assertEqual(view['status'], 'failed')
         self.assertNotIn('someone', json.dumps(self.c.state()))
         self.server.set_kanban_mode('garbage')
         self.assertEqual(self.refresh()[1]['status'], 'failed')
@@ -443,9 +477,9 @@ class Kanban(ApiCase):
         import os
         from unittest import mock
         with mock.patch.dict(os.environ, {'FAKE_HERMES_KANBAN': 'hang'}):
-            status, detail, rows = agent_tasks.fetch_kanban(str(Path(__file__).resolve().parent / 'fake_hermes.py'), timeout=1)
-        self.assertEqual((status, rows), ('failed', []))
-        self.assertIn('did not answer', detail)
+            result = agent_tasks.fetch_kanban(str(Path(__file__).resolve().parent / 'fake_hermes.py'), timeout=1)
+        self.assertEqual((result['status'], result.get('rows')), ('failed', None))
+        self.assertIn('did not answer', result['detail'])
 
     def test_board_name_is_validated(self):
         for board, expected in (('atm10-server', True), ('Bad Board', False), ('../x', False), ('', False)):
@@ -458,9 +492,9 @@ class Kanban(ApiCase):
         d = Path(tempfile.mkdtemp()) / 'w.sqlite3'
         migrations.migrate(d)
         c = sqlite3.connect(d); c.row_factory = sqlite3.Row
-        view = agent_tasks.kanban_view(c)
+        view = agent_tasks.kanban_view(c, '2026-10-20T00:00:00+00:00')
         c.close(); s.tmp.cleanup()
-        self.assertEqual((view['status'], view['count'], view['tasks']), ('unchecked', 0, []))
+        self.assertEqual((view['status'], view['counts']['stored'], view['tasks'], view['last_success_at'], view['stale']), ('unchecked', 0, [], None, None))
 
 
 class ExistingFeaturesPreserved(ApiCase):
@@ -508,7 +542,14 @@ class ExistingFeaturesPreserved(ApiCase):
         import tempfile, test_migrations
         d = Path(tempfile.mkdtemp())
         test_migrations.legacy_db(d / 'workbench.sqlite3')
-        s = Server(data=d); s.start()
+        s = Server(data=d)
+        code, message = s.run_to_exit()
+        self.assertEqual(code, 2, 'an existing database is not migrated without --migrate')
+        self.assertIn('--migrate', message)
+        self.assertEqual(sqlite3.connect(d / 'workbench.sqlite3').execute('PRAGMA user_version').fetchone()[0], 0)
+        self.assertEqual(list(d.glob('*.backup-*')), [], 'nothing was written, not even a backup')
+        s.args = ['--migrate']
+        s.start()
         try:
             c = s.client()
             state = c.state()

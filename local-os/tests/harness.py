@@ -1,4 +1,5 @@
 """Shared test harness: an isolated Keystal OS server on a free loopback port with a fake Hermes CLI."""
+import datetime as dt
 import http.cookiejar
 import json
 import os
@@ -68,8 +69,9 @@ class Client:
 
 class Server:
     """Context manager. `hermes=False` points the app at a path that does not exist (no Hermes installed)."""
-    def __init__(self, hermes=True, extra_env=None, data=None):
+    def __init__(self, hermes=True, extra_env=None, data=None, args=()):
         self.hermes = hermes
+        self.args = list(args)
         self.extra_env = extra_env or {}
         self.tmp = tempfile.TemporaryDirectory(prefix='keystal-agents-test-')
         self.data = Path(data) if data else Path(self.tmp.name) / 'state'
@@ -98,8 +100,11 @@ class Server:
         return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
 
     def start(self):
-        self.process = subprocess.Popen([sys.executable, str(LOCAL_OS / 'server.py')], env=self.env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.started_at = dt.datetime.now(dt.timezone.utc)
+        self.process = subprocess.Popen([sys.executable, str(LOCAL_OS / 'server.py'), *self.args], env=self.env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(100):
+            if self.process.poll() is not None:
+                raise RuntimeError(f'Test server exited with code {self.process.returncode}')
             try:
                 urllib.request.urlopen(self.base, timeout=1).close()
                 return self
@@ -116,10 +121,21 @@ class Server:
         self.stop()
         return self.start()
 
-    def client(self):
+    def client(self, wait_for_first_read=True):
         c = Client(self.base)
         c.bootstrap()
+        if wait_for_first_read:  # the server makes one Hermes Kanban read at startup; wait for THIS run's read (a persisted earlier attempt does not count)
+            for _ in range(150):
+                attempt = c.state()['kanban']['last_attempt_at']
+                if attempt and dt.datetime.fromisoformat(attempt) >= self.started_at:
+                    break
+                time.sleep(.1)
         return c
+
+    def run_to_exit(self, timeout=15):
+        """Run the server expecting it to refuse to start. Returns (exit code, stderr text)."""
+        process = subprocess.run([sys.executable, str(LOCAL_OS / 'server.py'), *self.args], env=self.env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=timeout)
+        return process.returncode, process.stderr
 
     def __enter__(self):
         return self.start()

@@ -85,15 +85,22 @@ const ago = (s) => { if (!s) return 'never'; const m = Math.max(0, Math.round((D
 const srcBadge = (source) => `<span class="src src-${escapeHTML(source)}" title="${escapeHTML(SOURCE_HINT[source] || '')}">${escapeHTML(SOURCE[source] || source)}</span>`;
 const statusBadge = (status) => `<span class="badge st-${escapeHTML(status)}">${escapeHTML((STATUS[status] || status).toUpperCase())}</span>`;
 const options = (pairs, selected) => pairs.map(([v, l]) => `<option value="${escapeHTML(v)}" ${v === selected ? 'selected' : ''}>${escapeHTML(l)}</option>`).join('');
+const ageText = (sec) => sec == null ? 'never' : sec < 60 ? 'just now' : sec < 3600 ? Math.round(sec / 60) + 'm ago' : sec < 86400 ? Math.round(sec / 3600) + 'h ago' : Math.round(sec / 86400) + 'd ago';
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const rendered = new WeakMap();
 function setHTML(target, html) { if (rendered.get(target) !== html) { target.innerHTML = html; rendered.set(target, html); } }
+function boardNote(b) {
+  if (!b) return '';
+  if (!b.has_snapshot) return `<p class="agent-live"><small>Kanban: ${b.status === 'unchecked' ? 'not read yet' : 'NOT CONNECTED. Counts are tracked tasks only.'}</small></p>`;
+  const flags = [b.stale ? 'STALE' : '', b.status !== 'connected' ? 'latest read did not succeed' : '', b.truncated ? 'TRUNCATED' : ''].filter(Boolean);
+  return `<p class="agent-live"><small>Counts include ${plural(b.board_only, 'unlinked board record')} (observed ${ageText(b.age_seconds)}${flags.length ? ' · ' + flags.join(' · ') : ''}). ${plural(b.linked, 'linked card')} counted once, through ${b.linked === 1 ? 'its' : 'their'} task. A board state is a record, not proof of a live worker.${b.drift ? ` ${plural(b.drift, 'linked task')} differ from the board.` : ''}</small></p>`;
+}
 function agentCard(a) {
   const c = a.counts, o = a.observation;
   let live;
   if (o) {
     const run = o.last_chat_run;
-    const kanban = o.kanban_status === 'connected' ? `Kanban: ${o.kanban_count} task${o.kanban_count === 1 ? '' : 's'} (read-only)` : 'Kanban: not connected';
-    live = `<p class="agent-live">${srcBadge('observed')} ${o.working_now ? 'Working on a chat turn now' : run ? `Last chat turn ${escapeHTML(run.status)} ${ago(run.ended || run.created)}` : 'No chat turns recorded yet'}<br><small>${kanban}</small></p>`;
+    live = `<p class="agent-live">${srcBadge('observed')} ${o.working_now ? 'Working on a chat turn now' : run ? `Last chat turn ${escapeHTML(run.status)} ${ago(run.ended || run.created)}` : 'No chat turns recorded yet'}</p>${boardNote(a.board)}`;
   } else live = '<p class="agent-live muted">No direct observation. Tracked tasks only.</p>';
   const stat = (key, label) => `<div class="${c[key] ? 'has' : ''}"><b>${c[key]}</b><span>${label}</span></div>`;
   const extra = [['failed', 'Failed'], ['stale', 'Stale'], ['paused', 'Paused']].filter(([k]) => c[k]).map(([k, l]) => `${c[k]} ${l.toLowerCase()}`).join(' · ');
@@ -101,15 +108,18 @@ function agentCard(a) {
   return `<article class="agent-card"><div class="agent-head"><div><h3>${escapeHTML(a.name)}</h3><small>${escapeHTML(a.role)}</small></div><span class="badge ${a.connection.status === 'observed' ? 'good' : 'pending'}" title="${escapeHTML(a.connection.detail)}">${escapeHTML(a.connection.label)}</span></div>${live}<div class="agent-stats">${stat('queued', 'QUEUED')}${stat('running', 'RUNNING')}${stat('awaiting_review', 'REVIEW')}${stat('blocked', 'BLOCKED')}</div>${extra ? `<p class="footnote">${extra}</p>` : ''}${running}<p class="agent-last">${a.last_update ? `Last recorded update ${ago(a.last_update.at)} ${srcBadge(a.last_update.source)}` : 'No updates recorded yet'}</p><div class="capture-actions"><button class="link-button" data-agent-filter="${a.id}">View tasks${a.open ? ' (' + a.open + ')' : ''} ↗</button><button class="link-button" data-new-task="${a.id}">＋ Track a task</button></div></article>`;
 }
 function attentionStrip() {
-  const t = state.agents.totals, total = Object.values(t).reduce((x, y) => x + y, 0);
-  if (!total) return '<p class="footnote attention">No tasks tracked yet. Agent cards show real connection status only; activity appears here once you track work.</p>';
-  const chips = ['awaiting_review', 'blocked', 'failed', 'stale'].filter(k => t[k]).map(k => `<button class="attn st-${k}" data-task-filter="${k}"><b>${t[k]}</b> ${STATUS[k].toLowerCase()}</button>`).join('');
+  const t = state.agents.totals, total = Object.values(t).reduce((x, y) => x + y, 0), k = state.kanban;
+  const bt = state.agents.board_totals;
+  const bparts = [['awaiting_review', 'awaiting review'], ['blocked', 'blocked'], ['running', 'running'], ['queued', 'queued']].filter(([key]) => bt[key]).map(([key, label]) => `${bt[key]} ${label}`);
+  const board = k.tasks.length ? `<p class="footnote attention">Hermes board, unlinked records (observed ${ageText(k.age_seconds)}${k.stale ? ' · STALE' : ''}${k.status !== 'connected' ? ' · latest read did not succeed' : ''}): ${bparts.join(' · ') || 'nothing active'}. Board states are records, not proof of a live worker.</p>` : '';
+  if (!total) return `<p class="footnote attention">No tasks tracked yet. Agent cards show real connection status only; activity appears here once you track work.</p>${board}`;
+  const chips = ['awaiting_review', 'blocked', 'failed', 'stale'].filter(key => t[key]).map(key => `<button class="attn st-${key}" data-task-filter="${key}"><b>${t[key]}</b> ${STATUS[key].toLowerCase()}</button>`).join('');
   const un = state.agents.unassigned_open ? `<span class="attn-note">${state.agents.unassigned_open} unassigned</span>` : '';
-  return `<div class="attention">${chips || '<span class="attn-note">Nothing is waiting on you.</span>'}${un}</div>`;
+  return `<div class="attention">${chips || '<span class="attn-note">Nothing is waiting on you.</span>'}${un}</div>${board}`;
 }
 function taskCard(t) {
-  const extra = [t.evidence_count ? `EVIDENCE ${t.evidence_count}` : 'NO EVIDENCE', REVIEW[t.review_state], t.requires_review ? '' : 'NO REVIEW REQUIRED'].filter(Boolean).map(x => `<span>${x}</span>`).join('');
-  return `<article class="task-card"><div class="capture-meta"><span>${escapeHTML(t.lane.toUpperCase())} · ${escapeHTML(t.priority.toUpperCase())}</span>${statusBadge(t.status)}</div><h3>${escapeHTML(t.title)}</h3><p class="footnote">${t.agent_name ? escapeHTML(t.agent_name) : 'Unassigned'}${t.due ? ' · Target: ' + escapeHTML(t.due) : ''} · Updated ${ago(t.updated)}</p><div class="task-flags"><span>Status from</span>${srcBadge(t.status_source)}${extra}</div><div class="capture-actions"><button class="button outline" data-task-open="${t.id}">${t.status === 'awaiting_review' ? 'Review output ↗' : 'Open task ↗'}</button></div></article>`;
+  const extra = [t.evidence_count ? `EVIDENCE ${t.evidence_count}` : 'NO EVIDENCE', REVIEW[t.review_state], t.requires_review ? '' : 'NO REVIEW REQUIRED', t.link_count ? `LINKED ${t.link_count}` : ''].filter(Boolean).map(x => `<span>${x}</span>`).join('');
+  return `<article class="task-card"><div class="capture-meta"><span>${escapeHTML(t.lane.toUpperCase())} · ${escapeHTML(t.priority.toUpperCase())}</span>${statusBadge(t.status)}</div><h3>${escapeHTML(t.title)}</h3><p class="footnote">${t.agent_name ? escapeHTML(t.agent_name) : 'Unassigned'}${t.project ? ' · ' + escapeHTML(t.project) : ''}${t.due ? ' · Target: ' + escapeHTML(t.due) : ''} · Updated ${ago(t.updated)}</p><div class="task-flags"><span>Status from</span>${srcBadge(t.status_source)}${extra}</div><div class="capture-actions"><button class="button outline" data-task-open="${t.id}">${t.status === 'awaiting_review' ? 'Review output ↗' : 'Open task ↗'}</button></div></article>`;
 }
 function renderAgents() {
   if (!state) return;
@@ -127,17 +137,31 @@ function renderAgents() {
     sf.innerHTML = options([['', 'Open tasks'], ...Object.entries(STATUS)], sf.value);
     $('#agent-task-agent').innerHTML = options([['', 'Unassigned'], ...agentOptions], '');
   }
-  const term = $('#task-search').value.toLowerCase(), agent = $('#task-agent-filter').value, status = $('#task-status-filter').value, done = $('#show-completed').checked;
-  const rows = state.agent_tasks.filter(t => (status ? t.status === status : done || t.status !== 'completed') && (!agent || (agent === '__none' ? !t.agent_id : t.agent_id === agent)) && `${t.title} ${t.description} ${t.agent_name || ''} ${t.lane}`.toLowerCase().includes(term));
+  const projects = state.projects.map(p => [p.name, p.name]), pf = $('#task-project-filter'), pkey = JSON.stringify(projects);
+  if (pf.dataset.key !== pkey) { pf.innerHTML = options([['', 'All projects'], ...projects, ['__none', 'No project']], pf.value); pf.dataset.key = pkey; $('#project-list').innerHTML = projects.map(([n]) => `<option value="${escapeHTML(n)}"></option>`).join(''); }
+  const term = $('#task-search').value.toLowerCase(), agent = $('#task-agent-filter').value, status = $('#task-status-filter').value, done = $('#show-completed').checked, project = pf.value;
+  const rows = state.agent_tasks.filter(t => (status ? t.status === status : done || t.status !== 'completed') && (!agent || (agent === '__none' ? !t.agent_id : t.agent_id === agent)) && (!project || (project === '__none' ? !t.project : t.project === project)) && `${t.title} ${t.description} ${t.agent_name || ''} ${t.lane} ${t.project || ''}`.toLowerCase().includes(term));
   setHTML($('#agent-task-list'), rows.length ? rows.map(taskCard).join('') : `<div class="empty-desk"><strong>${state.agent_tasks.length ? 'No tasks match these filters.' : 'No agent tasks yet.'}</strong><p>${state.agent_tasks.length ? 'Clear a filter or include completed tasks.' : 'Track a task to record who should do it, what they reported and the evidence. Nothing is sent to the agent.'}</p></div>`);
   renderKanban();
 }
+let kanbanShowAll = false;
+const KANBAN_LIST_LIMIT = 100;
 function renderKanban() {
-  const k = state.kanban;
-  const label = ({connected:'CONNECTED · READ-ONLY', not_connected:'NOT CONNECTED', failed:'READ FAILED', unchecked:'NOT CHECKED YET'})[k.status];
-  const head = `<div class="connection-row"><div><strong>Hermes Kanban board</strong><p>${escapeHTML(k.detail)}${k.checked_at ? ' Checked ' + escapeHTML(dateLabel(k.checked_at)) + '.' : ''}</p><span class="badge ${k.status === 'connected' ? 'good' : k.status === 'failed' ? 'failed' : 'pending'}">${label}</span>${k.status === 'connected' ? ' ' + srcBadge('observed') : ''}</div></div>`;
-  const rows = k.status !== 'connected' ? '' : k.tasks.length ? k.tasks.map(t => `<div class="kanban-row"><div><strong>${escapeHTML(t.title)}</strong><small>#${escapeHTML(t.external_id)} · ${t.assignee ? escapeHTML(t.assignee) : 'Unassigned in Hermes'} · Hermes status: ${escapeHTML(t.status_raw)}</small></div>${t.status ? statusBadge(t.status) : `<span class="badge">${escapeHTML(t.status_raw.toUpperCase())}</span>`}</div>`).join('') : '<div class="empty-desk"><strong>The Hermes board has no active tasks.</strong><p>Archived tasks are not shown.</p></div>';
-  setHTML($('#kanban-panel'), head + rows);
+  const k = state.kanban, c = k.counts;
+  const conn = ({connected:['CONNECTED · READ-ONLY', 'good'], not_connected:['NOT CONNECTED', 'pending'], failed:['READ FAILED', 'failed'], unchecked:['NOT READ YET', 'pending']})[k.status];
+  const attemptAge = k.last_attempt_at ? ageText(Math.max(0, Math.round((Date.now() - new Date(k.last_attempt_at)) / 1000))) : 'never';
+  const facts = `<div class="kanban-facts"><div><span class="eyebrow">LAST ATTEMPT</span><p>${attemptAge}</p><span class="badge ${conn[1]}">${conn[0]}</span></div><div><span class="eyebrow">LAST SUCCESSFUL READ</span><p>${k.last_success_at ? `${ageText(k.age_seconds)} · ${escapeHTML(dateLabel(k.last_success_at))}` : 'None yet'}</p>${k.stale ? '<span class="badge failed">STALE</span>' : k.last_success_at ? '<span class="badge good">FRESH</span>' : ''}</div><div><span class="eyebrow">BOARD</span><p>${escapeHTML(k.board.label)}</p>${k.board.changed ? '<span class="badge failed">CONFIG CHANGED SINCE THIS READ</span>' : ''}</div></div>`;
+  const error = k.error ? `<p class="kanban-error" role="status">${escapeHTML(k.error)}</p>` : '';
+  const keep = k.showing_last_success ? `<p class="kanban-keep">Showing the last successful read from ${escapeHTML(dateLabel(k.last_success_at))}. The latest attempt did not succeed, so these records may be out of date.</p>` : '';
+  const bits = k.last_success_at ? [`received ${c.received}`, `shown ${c.stored}`, c.duplicates ? `${c.duplicates} duplicate${c.duplicates === 1 ? '' : 's'} merged` : '', c.archived_skipped ? `${c.archived_skipped} archived skipped` : '', c.rejected ? `${c.rejected} not recognised` : ''].filter(Boolean).join(' · ') : '';
+  const trunc = c.truncated ? `<p class="kanban-error">TRUNCATED: ${c.dropped} more record${c.dropped === 1 ? '' : 's'} were not stored (limit ${c.stored}). Counts below cover stored records only.</p>` : '';
+  const raw = Object.keys(k.state_counts).length ? `<p class="footnote">Hermes states as reported: ${Object.entries(k.state_counts).map(([s, n]) => `${escapeHTML(s)} ${n}`).join(' · ')}</p>` : '';
+  const cadence = k.refresh_seconds ? `Read automatically every ${Math.max(1, Math.round(k.refresh_seconds / 60))} min while this server runs; ` : 'Automatic reads are off; ';
+  const shown = kanbanShowAll ? k.tasks : k.tasks.slice(0, KANBAN_LIST_LIMIT);
+  const rows = shown.map(t => `<div class="kanban-row"><div><strong>${escapeHTML(t.title)}</strong><small>#${escapeHTML(t.external_id)} · ${t.assignee ? escapeHTML(t.assignee) : 'Unassigned in Hermes'} · Hermes state: ${escapeHTML(t.status_raw)}${t.state_class && !['open', 'active', 'attention', 'closed'].includes(t.state_class) ? ' · ' + escapeHTML(t.state_class.toUpperCase()) : ''}</small></div><div class="kanban-tail">${t.linked_task_id ? `<button class="link-button" data-task-open="${t.linked_task_id}">LINKED · open task ↗</button>` : ''}${t.status ? statusBadge(t.status) : `<span class="badge">${escapeHTML(t.status_raw.toUpperCase())}</span>`}</div></div>`).join('');
+  const more = k.tasks.length > KANBAN_LIST_LIMIT ? `<button class="button outline small" data-kanban-toggle="1">${kanbanShowAll ? 'Show fewer' : `Show all ${k.tasks.length}`}</button><p class="footnote">Listing ${shown.length} of ${k.tasks.length} stored records.</p>` : '';
+  const empty = k.last_success_at && !k.tasks.length ? '<div class="empty-desk"><strong>The last successful read found no active records.</strong><p>Archived records are not shown.</p></div>' : '';
+  setHTML($('#kanban-panel'), `<div class="connection-row kanban-head"><div><strong>Hermes Kanban board</strong>${facts}${error}${keep}${trunc}${bits ? `<p class="footnote">${bits}</p>` : ''}${raw}<p class="footnote">${cadence}this is a read-only copy: nothing here changes Hermes. A board state such as running is an observed record, not proof that a worker is live. ${k.last_success_at ? srcBadge('observed') : ''}</p></div></div>${rows}${more}${empty}`);
 }
 function openTaskForm(agent = '') {
   $('#agent-task-form').reset(); $('#agent-task-agent').value = agent; $('#agent-task-dialog').showModal(); $('#agent-task-title').focus();
@@ -154,18 +178,31 @@ function renderTaskDialog(detail) {
   const review = t.status === 'awaiting_review' ? `<div class="review-panel"><strong>Your review</strong><p>${evidence.length ? `${evidence.length} evidence item${evidence.length === 1 ? '' : 's'} attached. Links are recorded, not fetched or verified by this OS.` : 'No evidence attached yet. Add a link or a note below before you can approve.'}</p><label>Review note <span class="optional">required to reject</span><textarea id="review-note" rows="2" maxlength="2000"></textarea></label><div class="capture-actions"><button class="button gold" data-review="approve" data-task="${id}" ${evidence.length ? '' : 'disabled'}>Approve output ✓</button><button class="button outline" data-review="reject" data-task="${id}">Reject · send back</button></div></div>` : '';
   const evidenceRows = evidence.length ? evidence.map(e => `<div class="evidence-row"><div><strong>${escapeHTML(e.label)}</strong>${e.url ? `<p>${safeLink(e.url)}</p>` : ''}${e.note ? `<p>${escapeHTML(e.note)}</p>` : ''}<small>${escapeHTML(dateLabel(e.at))}</small></div>${srcBadge(e.source)}</div>`).join('') : '<p class="footnote">No evidence recorded yet.</p>';
   const history = [...detail.history].reverse().map(h => `<div class="history-row"><span class="history-dot" aria-hidden="true"></span><div><strong>${escapeHTML(historyText(h))}</strong>${h.note ? `<p>${escapeHTML(h.note)}</p>` : ''}<small>${escapeHTML(dateLabel(h.at))} · ${escapeHTML(h.actor)} ${srcBadge(h.source)}</small></div></div>`).join('');
+  const refRows = detail.refs.length ? detail.refs.map(r => {
+    const br = r.board_record;
+    const board = !br ? '' : !br.comparable ? '<p>The last read is from a different board, so this card cannot be compared.</p>' : !br.in_last_read ? '<p>This card is not in the last successful read (finished, archived, removed or the board changed).</p>' : `<p>${srcBadge('observed')} Board record: ${escapeHTML(br.record.status_raw)} (${escapeHTML(br.record.state_class || 'unknown')}), read ${ageText(state.kanban.age_seconds)}. A board state is a record, not proof of a live worker.${br.drift ? ' <b>This differs from the status tracked here.</b>' : ''}</p>`;
+    return `<div class="evidence-row"><div><strong>${r.provider === 'hermes_kanban' ? 'Hermes Kanban card' : 'ClickUp task'}${r.label ? ' · ' + escapeHTML(r.label) : ''}</strong><p>${escapeHTML(r.instance)} / ${escapeHTML(r.scope)} / ${escapeHTML(r.external_id)}${r.url ? ' · ' + safeLink(r.url) : ''}</p>${board}<small>Linked ${escapeHTML(dateLabel(r.created))} · nothing was changed in the other system</small></div><button class="link-button" data-unlink="${r.id}" data-task="${id}">Unlink</button></div>`;
+  }).join('') : '<p class="footnote">Not linked to a Hermes card or a ClickUp task. ClickUp owns business commitments; Hermes Kanban owns internal agent execution. Links point to them; they do not copy or replace them.</p>';
+  const free = state.kanban.tasks.filter(x => !x.linked_task_id).slice(0, 200);
+  const hermesForm = state.kanban.link.enabled ? (free.length ? `<form class="task-form" data-task-form="link-hermes" data-task="${id}"><label>Link a Hermes Kanban card <span class="optional">from the last read of ${escapeHTML(state.kanban.board.name)}</span><select name="external_id">${options(free.map(x => [x.external_id, `${x.title} · ${x.status_raw}`]), '')}</select></label><div class="dialog-actions"><span>Records the link here only. The task must be Hermes's (or unassigned).</span><button class="button outline" type="submit">Link card ↗</button></div></form>` : '<p class="footnote">No unlinked cards in the last read.</p>') : `<p class="footnote">${escapeHTML(state.kanban.link.reason)}</p>`;
+  const clickForm = `<form class="task-form" data-task-form="link-clickup" data-task="${id}"><div class="form-grid"><label>ClickUp workspace id<input name="instance" maxlength="64" required></label><label>List or space id<input name="scope" maxlength="64" required></label></div><div class="form-grid"><label>ClickUp task id<input name="external_id" maxlength="128" required></label><label>Link <span class="optional">optional · http(s)</span><input name="url" type="url" maxlength="500" placeholder="https://"></label></div><div class="dialog-actions"><span>Reference only. This OS has no ClickUp adapter and changes nothing there.</span><button class="button outline" type="submit">Reference task ↗</button></div></form>`;
+  const linkForms = hermesForm + clickForm;
+  const sessionRows = detail.sessions.length ? detail.sessions.map(x => `<div class="evidence-row"><div><strong>${escapeHTML(x.agent_name)} · ${escapeHTML(x.session_ref)}${x.run_ref ? ' · run ' + escapeHTML(x.run_ref) : ''}</strong>${x.note ? `<p>${escapeHTML(x.note)}</p>` : ''}<small>${escapeHTML(dateLabel(x.created))}</small></div>${srcBadge(x.source)}</div>`).join('') : '<p class="footnote">No session or run identifiers recorded yet.</p>';
   $('#task-dialog-body').innerHTML = `<div class="dialog-top"><span class="eyebrow">AGENT TASK · ${escapeHTML(t.lane.toUpperCase())} · ${escapeHTML(t.priority.toUpperCase())}</span><button class="icon-button" data-close="task-dialog" aria-label="Close task">×</button></div>
 <h2>${escapeHTML(t.title)}</h2>
 <div class="task-flags">${statusBadge(t.status)}<span>Status from</span>${srcBadge(t.status_source)}${REVIEW[t.review_state] ? `<span>${REVIEW[t.review_state]}</span>` : ''}</div>
-<p class="footnote">${t.agent_name ? escapeHTML(t.agent_name) : 'Unassigned'}${t.due ? ' · Target: ' + escapeHTML(t.due) : ''} · Created ${escapeHTML(dateLabel(t.created))} · Last update ${ago(t.updated)}</p>
+<p class="footnote">${t.agent_name ? escapeHTML(t.agent_name) : 'Unassigned'}${t.project ? ' · ' + escapeHTML(t.project) : ''}${t.due ? ' · Target: ' + escapeHTML(t.due) : ''} · Created ${escapeHTML(dateLabel(t.created))} · Last update ${ago(t.updated)}</p>
 ${t.description ? `<p class="task-desc">${escapeHTML(t.description)}</p>` : ''}
 ${review}
 <h3 class="task-sub">Record an update</h3>
 <form class="task-form" data-task-form="update" data-task="${id}"><div class="form-grid"><label>Status<select name="status">${options([[t.status, STATUS[t.status] + ' (current)'], ...allowedStatuses(t).map(k => [k, STATUS[k]])], t.status)}</select></label><label>Where did this come from?<select name="source"><option value="manual">Manual · I am recording it</option><option value="agent_reported">Agent-reported · the agent told me</option></select></label></div><label>Note <span class="optional">required for blocked, failed or reopening</span><textarea name="note" rows="2" maxlength="2000"></textarea></label>${t.requires_review && t.status !== 'completed' ? '<p class="footnote">Completion goes through review: choose Awaiting review, attach evidence, then approve.</p>' : ''}<div class="dialog-actions"><span>Saved to history. No agent is contacted.</span><button class="button gold" type="submit">Record update ↗</button></div></form>
 <h3 class="task-sub">Output evidence (${evidence.length})</h3>${evidenceRows}
 <form class="task-form" data-task-form="evidence" data-task="${id}"><div class="form-grid"><label>Label<input name="label" maxlength="120" placeholder="e.g. Draft in shared folder" required></label><label>Link <span class="optional">optional · http(s)</span><input name="url" type="url" maxlength="500" placeholder="https://"></label></div><div class="form-grid"><label>Note <span class="optional">optional</span><input name="note" maxlength="1000"></label><label>Where did this come from?<select name="source"><option value="manual">Manual · I found it</option><option value="agent_reported">Agent-reported · the agent gave it</option></select></label></div><div class="dialog-actions"><span>Recorded, not fetched or verified.</span><button class="button outline" type="submit">Add evidence ↗</button></div></form>
+<h3 class="task-sub">Linked records (${detail.refs.length})</h3>${refRows}${linkForms}
+<h3 class="task-sub">Session and run identifiers (${detail.sessions.length})</h3>${sessionRows}
+<form class="task-form" data-task-form="session" data-task="${id}"><div class="form-grid"><label>Agent<select name="agent_id">${options(agents, t.agent_id || (agents[0] || [''])[0])}</select></label><label>Session id<input name="session_ref" maxlength="128" placeholder="the id the agent's own system shows" required></label></div><div class="form-grid"><label>Run id <span class="optional">optional</span><input name="run_ref" maxlength="128"></label><label>Where did this come from?<select name="source"><option value="manual">Manual · I copied it</option><option value="agent_reported">Agent-reported · the agent gave it</option></select></label></div><label>Note <span class="optional">optional</span><input name="note" maxlength="300"></label><div class="dialog-actions"><span>Identifiers only: never paste transcripts or secrets.</span><button class="button outline" type="submit">Add identifier ↗</button></div></form>
 <h3 class="task-sub">Details</h3>
-<form class="task-form" data-task-form="edit" data-task="${id}"><label>Title<input name="title" maxlength="200" value="${escapeHTML(t.title)}" required></label><label>Details<textarea name="description" rows="3" maxlength="4000">${escapeHTML(t.description)}</textarea></label><div class="form-grid"><label>Assigned to<select name="agent_id">${options([['', 'Unassigned'], ...agents], t.agent_id || '')}</select></label><label>Priority<select name="priority">${options([['low', 'Low'], ['normal', 'Normal'], ['high', 'High'], ['urgent', 'Urgent']], t.priority)}</select></label></div><div class="form-grid"><label>Work lane<select name="lane">${options(['Sell', 'Serve', 'Operate', 'Build', 'Personal'].map(l => [l, l]), t.lane)}</select></label><label>Target date <span class="optional">optional</span><input name="due" type="date" value="${escapeHTML(t.due)}"></label></div><label class="check-line"><input type="checkbox" name="requires_review" ${t.requires_review ? 'checked' : ''}> I must approve the output before this counts as complete</label><div class="dialog-actions"><span>Reassigning does not notify the agent.</span><button class="button outline" type="submit">Save details ↗</button></div></form>
+<form class="task-form" data-task-form="edit" data-task="${id}"><label>Title<input name="title" maxlength="200" value="${escapeHTML(t.title)}" required></label><label>Details<textarea name="description" rows="3" maxlength="4000">${escapeHTML(t.description)}</textarea></label><label>Project <span class="optional">optional</span><input name="project" list="project-list" maxlength="80" value="${escapeHTML(t.project || '')}"></label><div class="form-grid"><label>Assigned to<select name="agent_id">${options([['', 'Unassigned'], ...agents], t.agent_id || '')}</select></label><label>Priority<select name="priority">${options([['low', 'Low'], ['normal', 'Normal'], ['high', 'High'], ['urgent', 'Urgent']], t.priority)}</select></label></div><div class="form-grid"><label>Work lane<select name="lane">${options(['Sell', 'Serve', 'Operate', 'Build', 'Personal'].map(l => [l, l]), t.lane)}</select></label><label>Target date <span class="optional">optional</span><input name="due" type="date" value="${escapeHTML(t.due)}"></label></div><label class="check-line"><input type="checkbox" name="requires_review" ${t.requires_review ? 'checked' : ''}> I must approve the output before this counts as complete</label><div class="dialog-actions"><span>Reassigning does not notify the agent.</span><button class="button outline" type="submit">Save details ↗</button></div></form>
 <h3 class="task-sub">History</h3><div class="history">${history}</div>`;
 }
 async function openTask(id) {
@@ -231,6 +268,7 @@ async function refresh() {
     state = await api('/api/state');
     renderToday(); renderCaptures(); renderAgents(); renderDocuments(); renderEvents(); renderConnections(); renderChat();
     $('#server-status').textContent = 'Local workspace connected';
+    const label = state.runtime.preview_label || ''; $('#preview-banner').textContent = label; $('#preview-banner').hidden = !label;
   } catch (error) {
     $('#server-status').textContent = 'Local server unavailable — reload after restarting';
     $('#chat-status').textContent = 'Server unavailable';
@@ -262,6 +300,8 @@ document.addEventListener('click', async event => {
   if (b.dataset.prepare) prepare(b.dataset.prepare);
   if (b.dataset.doc) showDocument(b.dataset.doc);
   if (b.dataset.taskOpen) openTask(b.dataset.taskOpen);
+  if (b.dataset.kanbanToggle) { kanbanShowAll = !kanbanShowAll; renderKanban(); }
+  if (b.dataset.unlink) taskAction(b.dataset.task, '/api/agent-tasks/unlink', {ref_id: Number(b.dataset.unlink)}, 'Link removed here only. Nothing changed in the other system.');
   if (b.dataset.newTask !== undefined) openTaskForm(b.dataset.newTask);
   if (b.dataset.agentFilter) showTasks(b.dataset.agentFilter, '');
   if (b.dataset.taskFilter) showTasks('', b.dataset.taskFilter);
@@ -280,7 +320,7 @@ document.addEventListener('click', async event => {
   if (b.id === 'check-dropbox') {b.disabled=true;b.textContent='Checking…';try{const r=await api('/api/check/dropbox',{});toast(r.detail);await refresh();}catch(error){toast(error.message);}finally{b.disabled=false;}}
 });
 $('#task-add').addEventListener('click',()=>openTaskForm(''));
-['#task-search','#task-agent-filter','#task-status-filter','#show-completed'].forEach(s=>$(s).addEventListener(s==='#task-search'?'input':'change',renderAgents));
+['#task-search','#task-agent-filter','#task-status-filter','#task-project-filter','#show-completed'].forEach(s=>$(s).addEventListener(s==='#task-search'?'input':'change',renderAgents));
 $('#agent-task-form').addEventListener('submit',async event=>{event.preventDefault();const b=event.submitter;b.disabled=true;try{const body=Object.fromEntries(new FormData(event.target));body.requires_review=event.target.requires_review.checked;await api('/api/agent-tasks',body);$('#agent-task-dialog').close();await refresh();toast('Task saved on this Mac. No agent was contacted.');}catch(error){toast(error.message);}finally{b.disabled=false;}});
 $('#task-dialog').addEventListener('submit',event=>{
   event.preventDefault();
@@ -290,6 +330,9 @@ $('#task-dialog').addEventListener('submit',event=>{
     if (body.status === current) taskAction(id, '/api/agent-tasks/note', {note: body.note, source: body.source}, 'Note recorded. No agent contacted.');
     else taskAction(id, '/api/agent-tasks/status', {...body, expected_status: current}, 'Status recorded. No agent contacted.');
   } else if (f.dataset.taskForm === 'evidence') taskAction(id, '/api/agent-tasks/evidence', body, 'Evidence recorded. Not fetched or verified.');
+  else if (f.dataset.taskForm === 'link-hermes') taskAction(id, '/api/agent-tasks/link', {provider: 'hermes_kanban', external_id: body.external_id}, 'Linked here only. Nothing was changed in Hermes.');
+  else if (f.dataset.taskForm === 'link-clickup') taskAction(id, '/api/agent-tasks/link', {provider: 'clickup', ...body}, 'Referenced here only. Nothing was changed in ClickUp.');
+  else if (f.dataset.taskForm === 'session') taskAction(id, '/api/agent-tasks/session', body, 'Identifier recorded. Nothing was contacted.');
   else if (f.dataset.taskForm === 'edit') taskAction(id, '/api/agent-tasks/update', {...body, requires_review: f.requires_review.checked}, 'Details saved locally. No agent contacted.');
 });
 $('#open-capture').addEventListener('click',()=>openCapture());

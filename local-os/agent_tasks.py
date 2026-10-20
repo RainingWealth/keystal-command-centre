@@ -6,11 +6,16 @@ note and piece of evidence carries a provenance:
   manual          typed in by the owner in this app
   agent_reported  relayed by the owner from an agent; not verified by this OS
 The browser can only ever claim `manual` or `agent_reported`; `observed` is server-only.
+
+Authority boundary: ClickUp owns business commitments; Hermes Kanban owns internal agent
+execution. This app aggregates and links to them (read-only for Hermes) and keeps its own
+delegation, review and evidence records. It is never a third execution authority.
 """
 import datetime as dt
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import uuid
 from urllib.parse import urlsplit
@@ -25,8 +30,18 @@ LANES = ('Sell', 'Serve', 'Operate', 'Build', 'Personal')
 SENSITIVE = re.compile(r'\b[STFGM]\d{7}[A-Z]\b', re.I)
 TASK_ID = re.compile(r'[0-9a-f]{32}')
 BOARD = re.compile(r'[a-z0-9][a-z0-9_-]{0,63}')
-KANBAN_STATUS = {'triage': 'queued', 'todo': 'queued', 'ready': 'queued', 'running': 'running', 'blocked': 'blocked', 'review': 'awaiting_review', 'done': 'completed'}
-KANBAN_LIMIT = 200
+# Raw Hermes board state -> (our status or None, explicit state class). Raw states are always kept
+# as Hermes reported them; anything not listed is class "unknown" and is shown, never guessed at.
+KANBAN_STATES = {
+    'triage': ('queued', 'open'), 'todo': ('queued', 'open'), 'ready': ('queued', 'open'),
+    'running': ('running', 'active'), 'blocked': ('blocked', 'attention'), 'review': ('awaiting_review', 'attention'),
+    'done': ('completed', 'closed'), 'scheduled': (None, 'scheduled'), 'archived': (None, 'archived'),
+}
+KANBAN_MAX_STORED = 1000
+ID_PART = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}')
+REF_ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9._:/@+=-]{0,127}')
+TASK_FIELDS = ('title', 'description', 'agent_id', 'priority', 'lane', 'due', 'requires_review', 'project')
+PROVIDERS = ('clickup', 'hermes_kanban')
 
 
 def _stale_hours():
@@ -34,6 +49,18 @@ def _stale_hours():
         return max(float(os.environ.get('KEYSTAL_OS_STALE_HOURS', '24')), 0.0)
     except ValueError:
         return 24.0
+
+
+def kanban_timing():
+    """(refresh_seconds, stale_after_seconds). refresh 0 disables the background read."""
+    def number(name, default):
+        try:
+            return int(os.environ.get(name, default))
+        except ValueError:
+            return default
+    refresh = number('KEYSTAL_OS_KANBAN_REFRESH_SECONDS', 300)
+    refresh = 0 if refresh <= 0 else max(refresh, 30)
+    return refresh, max(number('KEYSTAL_OS_KANBAN_STALE_SECONDS', max(600, 2 * refresh)), 60)
 
 
 class ApiError(Exception):
@@ -109,6 +136,30 @@ def agent_ref(c, value):
     return row['id']
 
 
+def strict(data, allowed):
+    """Fail closed: a field this endpoint does not own (status, review_state, source...) is an error, not ignored."""
+    extra = sorted(set(data) - set(allowed))
+    if extra:
+        raise ApiError('Field(s) not accepted here: ' + ', '.join(str(k)[:40] for k in extra[:5]))
+
+
+def project_id(c, now, name):
+    if not name:
+        return None
+    key = ' '.join(name.lower().split())
+    row = c.execute('SELECT id FROM projects WHERE name_key=?', (key,)).fetchone()
+    if row:
+        return row['id']
+    pid = uuid.uuid4().hex
+    c.execute('INSERT INTO projects(id,name,name_key,created) VALUES(?,?,?,?)', (pid, ' '.join(name.split()), key, now))
+    return pid
+
+
+def project_name(c, pid):
+    row = c.execute('SELECT name FROM projects WHERE id=?', (pid,)).fetchone() if pid else None
+    return row['name'] if row else ''
+
+
 def load_task(c, data):
     tid = field(data, 'id', 64, required=True)
     row = c.execute('SELECT * FROM agent_tasks WHERE id=?', (tid,)).fetchone() if TASK_ID.fullmatch(tid) else None
@@ -138,6 +189,7 @@ def event(c, now, label, kind='agent'):
 # ----------------------------------------------------------------- mutations
 
 def create_task(c, now, data):
+    strict(data, TASK_FIELDS)
     title = field(data, 'title', 200, required=True)
     description = field(data, 'description', 4000)
     agent_id = agent_ref(c, data.get('agent_id'))
@@ -145,9 +197,10 @@ def create_task(c, now, data):
     lane = choice(data, 'lane', LANES, 'Operate')
     due = due_date(data.get('due'))
     requires_review = flag(data.get('requires_review', True), 'requires_review')
+    pid = project_id(c, now, field(data, 'project', 80))
     tid = uuid.uuid4().hex
-    c.execute('INSERT INTO agent_tasks(id,title,description,agent_id,status,status_source,review_state,requires_review,priority,lane,due,created,updated,status_changed) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-              (tid, title, description, agent_id, 'queued', 'manual', 'none', requires_review, priority, lane, due, now, now, now))
+    c.execute('INSERT INTO agent_tasks(id,title,description,agent_id,status,status_source,review_state,requires_review,priority,lane,due,project_id,created,updated,status_changed) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+              (tid, title, description, agent_id, 'queued', 'manual', 'none', requires_review, priority, lane, due, pid, now, now, now))
     name = c.execute('SELECT name FROM agents WHERE id=?', (agent_id,)).fetchone() if agent_id else None
     log(c, now, tid, 'created', 'manual', 'You', to_value='queued', note=f'Created and assigned to {name["name"]}' if name else 'Created, not yet assigned')
     event(c, now, f'Agent task saved locally{" for " + name["name"] if name else ""} — tracking only, no agent contacted')
@@ -155,6 +208,7 @@ def create_task(c, now, data):
 
 
 def update_task(c, now, data):
+    strict(data, ('id',) + TASK_FIELDS)
     task = load_task(c, data)
     changes = {}
     if 'title' in data:
@@ -171,6 +225,10 @@ def update_task(c, now, data):
         changes['due'] = due_date(data['due'])
     if 'requires_review' in data:
         changes['requires_review'] = flag(data['requires_review'], 'requires_review')
+    if 'project' in data:
+        wanted = field(data, 'project', 80)
+        if ' '.join(wanted.lower().split()) != ' '.join(project_name(c, task['project_id']).lower().split()):
+            changes['project_id'] = project_id(c, now, wanted)
     changes = {k: v for k, v in changes.items() if task[k] != v}
     if not changes:
         return 200, {'ok': True, 'changed': []}
@@ -178,20 +236,27 @@ def update_task(c, now, data):
         raise ApiError('Resolve the pending review before turning review off.')
     if 'agent_id' in changes and changes['agent_id'] is None and task['status'] == 'running':
         raise ApiError('A running task needs an agent. Change its status before unassigning.')
+    if 'requires_review' in changes and task['status'] == 'completed':
+        raise ApiError('Reopen the completed task before changing whether it needs review.', 409)
+    if 'agent_id' in changes and changes['agent_id'] != 'hermes' and c.execute("SELECT 1 FROM external_refs WHERE task_id=? AND provider='hermes_kanban'", (task['id'],)).fetchone():
+        raise ApiError('This task is linked to a Hermes Kanban card, so it stays with Hermes. Unlink the card first.', 409)
     sets = ','.join(f'{k}=?' for k in changes)
     c.execute(f'UPDATE agent_tasks SET {sets},updated=? WHERE id=?', (*changes.values(), now, task['id']))
     for key, new in changes.items():
         if key == 'agent_id':
             names = {r['id']: r['name'] for r in c.execute('SELECT id,name FROM agents')}
             log(c, now, task['id'], 'assigned', 'manual', 'You', 'agent', names.get(task['agent_id'], 'Unassigned'), names.get(new, 'Unassigned'))
+        elif key == 'project_id':
+            log(c, now, task['id'], 'edited', 'manual', 'You', 'project', project_name(c, task['project_id']), project_name(c, new))
         else:
             old = task[key]
             log(c, now, task['id'], 'edited', 'manual', 'You', key, str(old), str(new))
     event(c, now, 'Agent task edited locally — tracking only, no agent contacted')
-    return 200, {'ok': True, 'changed': sorted(changes)}
+    return 200, {'ok': True, 'changed': sorted('project' if k == 'project_id' else k for k in changes)}
 
 
 def set_status(c, now, data):
+    strict(data, ('id', 'status', 'source', 'note', 'expected_status'))
     task = load_task(c, data)
     new = choice(data, 'status', STATUSES, None)
     source = choice(data, 'source', CLIENT_SOURCES, 'manual')
@@ -223,6 +288,7 @@ def set_status(c, now, data):
 
 
 def add_note(c, now, data):
+    strict(data, ('id', 'note', 'source'))
     task = load_task(c, data)
     source = choice(data, 'source', CLIENT_SOURCES, 'manual')
     note = field(data, 'note', 2000, required=True)
@@ -233,6 +299,7 @@ def add_note(c, now, data):
 
 
 def add_evidence(c, now, data):
+    strict(data, ('id', 'label', 'url', 'note', 'source'))
     task = load_task(c, data)
     source = choice(data, 'source', CLIENT_SOURCES, 'manual')
     label = field(data, 'label', 120, required=True)
@@ -246,6 +313,7 @@ def add_evidence(c, now, data):
 
 
 def review_task(c, now, data):
+    strict(data, ('id', 'decision', 'note'))
     task = load_task(c, data)
     decision = choice(data, 'decision', ('approve', 'reject'), None)
     note = field(data, 'note', 2000)
@@ -269,7 +337,92 @@ def review_task(c, now, data):
     return 200, {'ok': True}
 
 
+def _ref_part(data, key, pattern, required=True):
+    value = field(data, key, 128, required=required)
+    if value and not pattern.fullmatch(value):
+        raise ApiError(f'Invalid {key}')
+    return value
+
+
+def link_task(c, now, data):
+    """Record that a local task corresponds to a record in a system that owns that record.
+    Nothing is written to that system, and the task's own status is not overwritten by it."""
+    strict(data, ('id', 'provider', 'external_id', 'instance', 'scope', 'url', 'label'))
+    task = load_task(c, data)
+    provider = choice(data, 'provider', PROVIDERS, None)
+    external_id = _ref_part(data, 'external_id', REF_ID)
+    label = field(data, 'label', 120)
+    if provider == 'hermes_kanban':
+        if 'instance' in data or 'scope' in data:
+            raise ApiError('Hermes links take their board and profile from the last read, not from the request.')
+        meta = _kanban_meta(c)
+        if not meta['snapshot_pinned'] or not meta['snapshot_board'] or not meta['instance']:
+            raise ApiError('Pin a board (KEYSTAL_OS_KANBAN_BOARD) and refresh before linking cards: a card id is only unique within its board.', 409)
+        card = c.execute('SELECT title FROM kanban_snapshot WHERE external_id=?', (external_id,)).fetchone()
+        if not card:
+            raise ApiError('That card is not in the last successful Hermes read. Refresh the board and try again.', 404)
+        if task['agent_id'] not in (None, 'hermes'):
+            raise ApiError('Hermes Kanban cards can only be linked to tasks assigned to Hermes.', 409)
+        instance, scope, url, label = meta['instance'], meta['snapshot_board'], '', label or card['title'][:120]
+    else:
+        instance, scope = _ref_part(data, 'instance', ID_PART), _ref_part(data, 'scope', ID_PART)
+        url = evidence_url(data.get('url'))
+    try:
+        c.execute('INSERT INTO external_refs(task_id,provider,instance,scope,external_id,url,label,source,created) VALUES(?,?,?,?,?,?,?,?,?)',
+                  (task['id'], provider, instance, scope, external_id, url, label, 'manual', now))
+    except sqlite3.IntegrityError:
+        raise ApiError('That external record is already linked to a task.', 409)
+    if provider == 'hermes_kanban' and task['agent_id'] is None:
+        c.execute("UPDATE agent_tasks SET agent_id='hermes' WHERE id=?", (task['id'],))
+        log(c, now, task['id'], 'assigned', 'manual', 'You', 'agent', 'Unassigned', 'Hermes', 'Assigned to Hermes by linking a Hermes Kanban card')
+    c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
+    log(c, now, task['id'], 'edited', 'manual', 'You', 'link', None, f'{provider}:{instance}/{scope}/{external_id}', 'Link recorded here only; nothing was changed in the other system')
+    event(c, now, f'Task linked to a {"Hermes Kanban card" if provider == "hermes_kanban" else "ClickUp task"} — nothing changed in that system')
+    return 201, {'ok': True}
+
+
+def unlink_task(c, now, data):
+    strict(data, ('id', 'ref_id'))
+    task = load_task(c, data)
+    ref_id = data.get('ref_id')
+    if not isinstance(ref_id, int) or isinstance(ref_id, bool):
+        raise ApiError('Invalid ref_id')
+    ref = c.execute('SELECT * FROM external_refs WHERE id=? AND task_id=?', (ref_id, task['id'])).fetchone()
+    if not ref:
+        raise ApiError('Link not found', 404)
+    c.execute('DELETE FROM external_refs WHERE id=?', (ref_id,))
+    c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
+    log(c, now, task['id'], 'edited', 'manual', 'You', 'link', f"{ref['provider']}:{ref['instance']}/{ref['scope']}/{ref['external_id']}", None, 'Link removed here only; nothing was changed in the other system')
+    event(c, now, 'Task link removed — nothing changed in the other system')
+    return 200, {'ok': True}
+
+
+def add_session(c, now, data):
+    """Attach an opaque session/run identifier from an agent's own system. Identifiers only, never transcripts."""
+    strict(data, ('id', 'agent_id', 'session_ref', 'run_ref', 'note', 'source'))
+    task = load_task(c, data)
+    source = choice(data, 'source', CLIENT_SOURCES, 'manual')
+    agent_id = agent_ref(c, data.get('agent_id') or task['agent_id'])
+    if not agent_id:
+        raise ApiError('Say which agent this session belongs to, or assign the task first.')
+    session_ref = _ref_part(data, 'session_ref', REF_ID)
+    run_ref = _ref_part(data, 'run_ref', REF_ID, required=False)
+    note = field(data, 'note', 300)
+    try:
+        c.execute('INSERT INTO agent_task_sessions(task_id,agent_id,session_ref,run_ref,note,source,created) VALUES(?,?,?,?,?,?,?)',
+                  (task['id'], agent_id, session_ref, run_ref, note, source, now))
+    except sqlite3.IntegrityError:
+        raise ApiError('That session is already recorded on this task.', 409)
+    c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
+    log(c, now, task['id'], 'edited', source, actor_for(c, task, source), 'session', None, f'{agent_id}:{session_ref}' + (f'#{run_ref}' if run_ref else ''), note)
+    event(c, now, f'Session identifier recorded ({SOURCE_LABELS[source]}) — nothing was contacted')
+    return 201, {'ok': True}
+
+
 ROUTES = {
+    '/api/agent-tasks/link': link_task,
+    '/api/agent-tasks/unlink': unlink_task,
+    '/api/agent-tasks/session': add_session,
     '/api/agent-tasks': create_task,
     '/api/agent-tasks/update': update_task,
     '/api/agent-tasks/status': set_status,
@@ -302,76 +455,217 @@ def sweep_stale(c, now_iso):
 # --------------------------------------------------------------------- reads
 
 def list_tasks(c):
-    rows = c.execute('''SELECT t.*, a.name AS agent_name,
-        (SELECT COUNT(*) FROM agent_task_evidence e WHERE e.task_id=t.id) AS evidence_count
-        FROM agent_tasks t LEFT JOIN agents a ON a.id=t.agent_id ORDER BY t.updated DESC, t.created DESC''').fetchall()
+    rows = c.execute('''SELECT t.*, a.name AS agent_name, p.name AS project,
+        (SELECT COUNT(*) FROM agent_task_evidence e WHERE e.task_id=t.id) AS evidence_count,
+        (SELECT COUNT(*) FROM external_refs r WHERE r.task_id=t.id) AS link_count
+        FROM agent_tasks t LEFT JOIN agents a ON a.id=t.agent_id LEFT JOIN projects p ON p.id=t.project_id
+        ORDER BY t.updated DESC, t.created DESC''').fetchall()
     return [dict(r) for r in rows]
+
+
+def list_projects(c):
+    return [dict(r) for r in c.execute("""SELECT p.id,p.name,
+        (SELECT COUNT(*) FROM agent_tasks t WHERE t.project_id=p.id AND t.status!='completed') AS open_tasks,
+        (SELECT COUNT(*) FROM agent_tasks t WHERE t.project_id=p.id) AS tasks
+        FROM projects p ORDER BY p.name_key""")]
 
 
 def task_detail(c, tid):
     if not TASK_ID.fullmatch(tid):
         raise ApiError('Task not found', 404)
-    row = c.execute('SELECT t.*, a.name AS agent_name FROM agent_tasks t LEFT JOIN agents a ON a.id=t.agent_id WHERE t.id=?', (tid,)).fetchone()
+    row = c.execute('SELECT t.*, a.name AS agent_name, p.name AS project FROM agent_tasks t LEFT JOIN agents a ON a.id=t.agent_id LEFT JOIN projects p ON p.id=t.project_id WHERE t.id=?', (tid,)).fetchone()
     if not row:
         raise ApiError('Task not found', 404)
+    meta = _kanban_meta(c)
+    refs = []
+    for r in c.execute('SELECT * FROM external_refs WHERE task_id=? ORDER BY id', (tid,)):
+        ref = dict(r)
+        if r['provider'] == 'hermes_kanban':
+            same_board = meta['snapshot_pinned'] and meta['snapshot_board'] == r['scope'] and meta['instance'] == r['instance']
+            card = c.execute('SELECT external_id,title,status_raw,status,state_class,assignee,updated_raw FROM kanban_snapshot WHERE external_id=?', (r['external_id'],)).fetchone() if same_board else None
+            ref['board_record'] = {'comparable': bool(same_board), 'in_last_read': bool(card), 'last_success_at': meta['last_success_at'], 'snapshot_board': meta['snapshot_board'],
+                                   'record': dict(card) if card else None,
+                                   'drift': bool(card and card['status'] and card['status'] != row['status'])}
+        refs.append(ref)
     return {
         'task': dict(row),
         'history': [dict(r) for r in c.execute('SELECT * FROM agent_task_history WHERE task_id=? ORDER BY id', (tid,))],
         'evidence': [dict(r) for r in c.execute('SELECT * FROM agent_task_evidence WHERE task_id=? ORDER BY id', (tid,))],
+        'refs': refs,
+        'sessions': [dict(r) for r in c.execute('SELECT s.*, a.name AS agent_name FROM agent_task_sessions s JOIN agents a ON a.id=s.agent_id WHERE s.task_id=? ORDER BY s.id', (tid,))],
     }
 
 
 def export_rows(c):
     return {
         'agents': [dict(r) for r in c.execute('SELECT * FROM agents ORDER BY position')],
+        'projects': [dict(r) for r in c.execute('SELECT * FROM projects ORDER BY name_key')],
         'agent_tasks': [dict(r) for r in c.execute('SELECT * FROM agent_tasks ORDER BY created')],
         'agent_task_history': [dict(r) for r in c.execute('SELECT * FROM agent_task_history ORDER BY id')],
         'agent_task_evidence': [dict(r) for r in c.execute('SELECT * FROM agent_task_evidence ORDER BY id')],
+        'external_refs': [dict(r) for r in c.execute('SELECT * FROM external_refs ORDER BY id')],
+        'agent_task_sessions': [dict(r) for r in c.execute('SELECT * FROM agent_task_sessions ORDER BY id')],
     }
 
 
-def kanban_view(c):
+# ------------------------------------------------------------ Hermes Kanban
+
+_KANBAN_DEFAULTS = {'last_attempt_at': None, 'last_attempt_status': 'unchecked', 'last_attempt_detail': 'Not checked yet. Use Refresh to read the Hermes Kanban board.',
+                    'last_success_at': None, 'attempt_board': None, 'snapshot_board': None, 'snapshot_pinned': False, 'instance': None,
+                    'received': 0, 'rejected': 0, 'archived_skipped': 0, 'duplicates': 0, 'unique': 0, 'stored': 0, 'dropped': 0, 'truncated': False,
+                    'state_counts': {}, 'status_counts': {}, 'class_counts': {}}
+
+
+def _kanban_meta(c):
+    """Stored read bookkeeping, normalised. Understands the earlier (schema v2) shape."""
     row = c.execute("SELECT value FROM meta WHERE key='kanban'").fetchone()
-    meta = json.loads(row['value']) if row else {'status': 'unchecked', 'detail': 'Not checked yet. Use Refresh to read the Hermes Kanban board.', 'checked_at': None, 'count': 0}
-    tasks = [dict(r) for r in c.execute('SELECT external_id,title,status_raw,status,assignee,updated_raw,fetched FROM kanban_snapshot ORDER BY rowid')]
-    return {**meta, 'tasks': tasks, 'source': 'observed'}
+    if not row:
+        return dict(_KANBAN_DEFAULTS)
+    raw = json.loads(row['value'])
+    if 'last_attempt_at' in raw:
+        return {**_KANBAN_DEFAULTS, **raw}
+    ok = raw.get('status') == 'connected'
+    count = raw.get('count', 0) if ok else 0
+    return {**_KANBAN_DEFAULTS, 'last_attempt_at': raw.get('checked_at'), 'last_attempt_status': raw.get('status', 'unchecked'), 'last_attempt_detail': raw.get('detail', ''),
+            'last_success_at': raw.get('checked_at') if ok else None, 'received': count, 'unique': count, 'stored': count}
 
 
-def overview(c, runtime):
-    """One card per agent. Counts come from tracked tasks; only Hermes has directly observed facts."""
+def kanban_view(c, now_iso):
+    """What the dashboard may say about Hermes Kanban. Every fact is separate: the last attempt (and its
+    sanitized error), the last success (and how old it is), and the snapshot actually displayed."""
+    meta = _kanban_meta(c)
+    refresh, stale_after = kanban_timing()
+    links = {}
+    if meta['snapshot_pinned'] and meta['instance']:
+        for r in c.execute("SELECT external_id,task_id FROM external_refs WHERE provider='hermes_kanban' AND instance=? AND scope=?", (meta['instance'], meta['snapshot_board'])):
+            links[r['external_id']] = r['task_id']
+    tasks = [{**dict(r), 'linked_task_id': links.get(r['external_id'])} for r in c.execute('SELECT external_id,title,status_raw,status,state_class,assignee,updated_raw,fetched FROM kanban_snapshot ORDER BY rowid')]
+    age = stale = None
+    if meta['last_success_at']:
+        age = max(0, int((dt.datetime.fromisoformat(now_iso) - dt.datetime.fromisoformat(meta['last_success_at'])).total_seconds()))
+        stale = age > stale_after
+    status = meta['last_attempt_status']
+    pinned = bool(meta['snapshot_pinned'])
+    if meta['last_success_at'] is None:
+        board = {'name': None, 'pinned': False, 'label': 'No board has been read yet'}
+    else:
+        board = {'name': meta['snapshot_board'], 'pinned': pinned, 'label': f"Board: {meta['snapshot_board']}" if pinned else 'Hermes current board (not pinned: the board is whichever Hermes has selected)'}
+    board['configured'] = meta['attempt_board']
+    board['changed'] = bool(meta['last_success_at'] and meta['attempt_board'] != meta['snapshot_board'])
+    counts = {k: meta[k] for k in ('received', 'rejected', 'archived_skipped', 'duplicates', 'unique', 'stored', 'dropped', 'truncated')}
+    counts['listed_total'] = len(tasks)
+    return {
+        'status': status, 'detail': meta['last_attempt_detail'], 'error': meta['last_attempt_detail'] if status in ('failed', 'not_connected') else None,
+        'last_attempt_at': meta['last_attempt_at'], 'last_success_at': meta['last_success_at'], 'age_seconds': age, 'stale': stale,
+        'stale_after_seconds': stale_after, 'refresh_seconds': refresh,
+        'showing_last_success': bool(meta['last_success_at']) and status != 'connected',
+        'board': board, 'counts': counts, 'state_counts': meta['state_counts'], 'status_counts': meta['status_counts'], 'class_counts': meta['class_counts'],
+        'link': {'enabled': bool(pinned and meta['instance'] and meta['last_success_at']),
+                 'reason': None if pinned and meta['instance'] and meta['last_success_at'] else 'Linking needs a pinned board (KEYSTAL_OS_KANBAN_BOARD) and one successful read: a card id is only unique within its board.'},
+        'tasks': tasks, 'source': 'observed',
+    }
+
+
+def overview(c, runtime, kanban):
+    """One card per agent. Counts come from tracked tasks; only Hermes has directly observed facts.
+    A Hermes board card that is linked to a tracked task is counted once, through that task; board
+    cards with no link are added to Hermes. Board states are observed records, not proof of a live worker."""
     counts = {}
     for r in c.execute('SELECT agent_id,status,COUNT(*) AS n FROM agent_tasks GROUP BY agent_id,status'):
         counts.setdefault(r['agent_id'], {})[r['status']] = r['n']
     last_run = c.execute('SELECT status,created,ended FROM runs ORDER BY created DESC LIMIT 1').fetchone()
-    kanban = kanban_view(c)
+    board_only = [t for t in kanban['tasks'] if not t['linked_task_id']]
+    board_extra = {s: 0 for s in STATUSES}
+    for t in board_only:
+        if t['status']:
+            board_extra[t['status']] += 1
+    drift = 0
+    if kanban['tasks']:
+        local = {r['id']: r['status'] for r in c.execute('SELECT id,status FROM agent_tasks')}
+        drift = sum(1 for t in kanban['tasks'] if t['linked_task_id'] and t['status'] and local.get(t['linked_task_id']) != t['status'])
     cards = []
     for a in c.execute('SELECT * FROM agents ORDER BY position').fetchall():
         tally = {s: counts.get(a['id'], {}).get(s, 0) for s in STATUSES}
         last = c.execute("SELECT h.at,h.kind,h.source FROM agent_task_history h JOIN agent_tasks t ON t.id=h.task_id WHERE t.agent_id=? AND h.source!='observed' ORDER BY h.id DESC LIMIT 1", (a['id'],)).fetchone()
         running = [dict(r) for r in c.execute("SELECT id,title,status_source,updated FROM agent_tasks WHERE agent_id=? AND status='running' ORDER BY updated DESC LIMIT 3", (a['id'],))]
-        card = {'id': a['id'], 'name': a['name'], 'role': a['role'], 'counts': tally, 'open': sum(v for k, v in tally.items() if k != 'completed'),
-                'last_update': dict(last) if last else None, 'running': running, 'observation': None}
+        card = {'id': a['id'], 'name': a['name'], 'role': a['role'], 'last_update': dict(last) if last else None, 'running': running, 'observation': None, 'board': None}
         if a['integration'] == 'local_cli':
             found = bool(runtime.get('bridge_available'))
+            tracked = sum(tally.values())
+            for s in STATUSES:
+                tally[s] += board_extra[s]
             card['connection'] = {'status': 'observed' if found else 'not_connected', 'label': 'LOCAL CLI DETECTED' if found else 'HERMES CLI NOT FOUND',
                                   'detail': 'Runs on this Mac. This OS observes its chat bridge directly.' if found else 'Install or configure Hermes. Nothing about Hermes can be observed until then.'}
-            card['observation'] = {'working_now': bool(runtime.get('busy')), 'last_chat_run': dict(last_run) if last_run else None,
-                                   'kanban_status': kanban['status'], 'kanban_count': kanban['count'] if kanban['status'] == 'connected' else None}
+            card['observation'] = {'working_now': bool(runtime.get('busy')), 'last_chat_run': dict(last_run) if last_run else None}
+            card['board'] = {'status': kanban['status'], 'has_snapshot': bool(kanban['tasks']) or kanban['last_success_at'] is not None, 'stale': kanban['stale'], 'age_seconds': kanban['age_seconds'],
+                             'tracked_tasks': tracked, 'board_only': len(board_only), 'linked': sum(1 for t in kanban['tasks'] if t['linked_task_id']),
+                             'scheduled': sum(1 for t in board_only if t['state_class'] == 'scheduled'), 'unknown': sum(1 for t in board_only if t['state_class'] == 'unknown'),
+                             'drift': drift, 'truncated': kanban['counts']['truncated']}
         else:
             card['connection'] = {'status': 'not_connected', 'label': 'NOT CONNECTED', 'detail': 'No API or adapter. Status comes only from tasks you enter and updates you or the agent report.'}
+        card['counts'] = tally
+        card['open'] = sum(v for k, v in tally.items() if k != 'completed')
         cards.append(card)
     total = {s: sum(counts.get(k, {}).get(s, 0) for k in counts) for s in STATUSES}
     unassigned = sum(v for k, v in counts.get(None, {}).items() if k != 'completed')
-    return {'agents': cards, 'totals': total, 'unassigned_open': unassigned, 'stale_hours': _stale_hours()}
+    return {'agents': cards, 'totals': total, 'board_totals': board_extra, 'unassigned_open': unassigned, 'stale_hours': _stale_hours()}
 
 
-# ------------------------------------------------------------ Hermes Kanban
+def parse_kanban(data):
+    """Normalise a decoded `hermes kanban list --json` payload. Fails closed: a non-empty list in which
+    nothing is recognisable is a read failure, never a connected board with zero tasks."""
+    if isinstance(data, dict):
+        data = next((data[k] for k in ('tasks', 'items', 'data') if isinstance(data.get(k), list)), None)
+    if not isinstance(data, list):
+        return {'status': 'failed', 'detail': 'Hermes Kanban output was not a task list this app recognises. Nothing was imported and the last good read is kept.'}
+    received = len(data)
+    seen, rows, names = set(), [], set()
+    rejected = archived = duplicates = 0
+    for item in data:
+        if not isinstance(item, dict):
+            rejected += 1
+            continue
+        names.update(str(k)[:40] for k in list(item)[:60])
+        ident = item.get('id', item.get('task_id'))
+        title = item.get('title')
+        if ident in (None, '') or isinstance(ident, (dict, list)) or not isinstance(title, str) or not title.strip():
+            rejected += 1
+            continue
+        raw = str(item.get('status') if item.get('status') not in (None, '') else 'unknown').strip()[:40] or 'unknown'
+        mapped, state_class = KANBAN_STATES.get(raw.lower(), (None, 'unknown'))
+        if state_class == 'archived':
+            archived += 1
+            continue
+        eid = str(ident)[:80]
+        if eid in seen:
+            duplicates += 1
+            continue
+        seen.add(eid)
+        assignee = item.get('assignee')
+        updated = item.get('updated_at', item.get('updated', item.get('created_at')))
+        rows.append({'external_id': eid, 'title': title.strip()[:300], 'status_raw': raw, 'status': mapped, 'state_class': state_class,
+                     'assignee': str(assignee)[:80] if assignee and not isinstance(assignee, (dict, list)) else None,
+                     'updated_raw': str(updated)[:40] if updated is not None and not isinstance(updated, (dict, list)) else None})
+    counts = {'received': received, 'rejected': rejected, 'archived_skipped': archived, 'duplicates': duplicates, 'unique': len(rows)}
+    if received and rejected == received:
+        return {'status': 'failed', 'detail': f'Hermes returned {received} record{"" if received == 1 else "s"} but none were recognisable as tasks (each needs an id and a title). Nothing was imported and the last good read is kept.', **counts, 'field_names': sorted(names)}
+    stored = rows[:KANBAN_MAX_STORED]
+    dropped = len(rows) - len(stored)
+    parts = [f'received {received}', f'{len(stored)} shown']
+    for label, n in (('duplicates merged', duplicates), ('archived skipped', archived), ('not recognised', rejected)):
+        if n:
+            parts.append(f'{n} {label}')
+    if dropped:
+        parts.append(f'TRUNCATED: {dropped} more not stored (limit {KANBAN_MAX_STORED})')
+    return {'status': 'connected', 'detail': 'Read the Hermes Kanban board (read-only): ' + ', '.join(parts) + '. Nothing was changed in Hermes.',
+            'rows': stored, **counts, 'stored': len(stored), 'dropped': dropped, 'truncated': bool(dropped), 'field_names': sorted(names)}
+
 
 def fetch_kanban(hermes, board=None, timeout=20):
-    """Read-only: runs `hermes kanban list --json`. Returns (status, detail, rows).
-    status is connected | not_connected | failed. Raw stderr is never surfaced."""
+    """Read-only: runs `hermes kanban [--board B] list --json` and returns a result dict with
+    status connected | not_connected | failed. Raw stderr is never surfaced."""
     if not hermes:
-        return 'not_connected', 'Hermes CLI not found, so the Kanban board cannot be read.', []
+        return {'status': 'not_connected', 'detail': 'Hermes CLI not found, so the Kanban board cannot be read.'}
     args = [hermes, 'kanban']
     if board:
         args += ['--board', board]
@@ -379,48 +673,45 @@ def fetch_kanban(hermes, board=None, timeout=20):
     try:
         r = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors='replace', timeout=timeout)
     except subprocess.TimeoutExpired:
-        return 'failed', f'Hermes did not answer within {timeout} seconds. Nothing was changed.', []
+        return {'status': 'failed', 'detail': f'Hermes did not answer within {timeout} seconds. Nothing was changed and the last good read is kept.'}
     except OSError:
-        return 'not_connected', 'Hermes CLI could not be started.', []
+        return {'status': 'not_connected', 'detail': 'Hermes CLI could not be started.'}
     if r.returncode:
         err = (r.stderr or '').lower()
         if re.search(r'invalid choice|unknown command|no such command', err) and 'kanban' in err:
-            return 'not_connected', 'This Hermes version has no Kanban command, so there is nothing to read.', []
-        return 'failed', 'Hermes could not list the Kanban board. Run `hermes kanban list` in a terminal to see why. Nothing was changed.', []
+            return {'status': 'not_connected', 'detail': 'This Hermes version has no Kanban command, so there is nothing to read.'}
+        return {'status': 'failed', 'detail': 'Hermes could not list the Kanban board. Run `hermes kanban list` in a terminal to see why. Nothing was changed and the last good read is kept.'}
     if len(r.stdout) > 2_000_000:
-        return 'failed', 'Hermes returned more Kanban data than this app will read.', []
+        return {'status': 'failed', 'detail': 'Hermes returned more Kanban data than this app will read. The last good read is kept.'}
     try:
         data = json.loads(r.stdout)
     except ValueError:
-        return 'failed', 'Hermes Kanban output was not JSON this app recognises. Nothing was imported.', []
-    if isinstance(data, dict):
-        data = next((data[k] for k in ('tasks', 'items', 'data') if isinstance(data.get(k), list)), None)
-    if not isinstance(data, list):
-        return 'failed', 'Hermes Kanban output was not a task list this app recognises. Nothing was imported.', []
-    rows = []
-    for item in data:
-        if not isinstance(item, dict):
-            continue
-        ident = item.get('id', item.get('task_id'))
-        title = item.get('title')
-        if ident in (None, '') or not isinstance(title, str) or not title.strip():
-            continue
-        raw = str(item.get('status') or 'unknown').lower()
-        if raw == 'archived':
-            continue
-        assignee = item.get('assignee')
-        updated = item.get('updated_at', item.get('updated', item.get('created_at')))
-        rows.append({'external_id': str(ident)[:80], 'title': title.strip()[:300], 'status_raw': raw[:40], 'status': KANBAN_STATUS.get(raw),
-                     'assignee': str(assignee)[:80] if assignee else None, 'updated_raw': str(updated)[:40] if updated is not None else None})
-    return 'connected', f'Read {len(rows)} task{"" if len(rows) == 1 else "s"} from the Hermes Kanban board. Read-only; nothing was changed in Hermes.', rows[:KANBAN_LIMIT]
+        return {'status': 'failed', 'detail': 'Hermes Kanban output was not JSON this app recognises. Nothing was imported and the last good read is kept.'}
+    return parse_kanban(data)
 
 
-def store_kanban(c, now, status, detail, rows):
-    c.execute('DELETE FROM kanban_snapshot')
-    if status == 'connected':
-        c.executemany('INSERT OR REPLACE INTO kanban_snapshot(external_id,title,status_raw,status,assignee,updated_raw,fetched) VALUES(?,?,?,?,?,?,?)',
-                      [(r['external_id'], r['title'], r['status_raw'], r['status'], r['assignee'], r['updated_raw'], now) for r in rows])
-    meta = {'status': status, 'detail': detail, 'checked_at': now, 'count': len(rows)}
+def store_kanban(c, now, result, board, instance, manual=False):
+    """Record one read attempt. A successful read replaces the snapshot atomically; a failed or
+    unsupported read leaves the last good snapshot and its counts untouched."""
+    meta = _kanban_meta(c)
+    previous = meta['last_attempt_status']
+    meta.update(last_attempt_at=now, last_attempt_status=result['status'], last_attempt_detail=result['detail'], attempt_board=board, instance=instance)
+    if result['status'] == 'connected':
+        rows = result['rows']
+        c.execute('DELETE FROM kanban_snapshot')
+        c.executemany('INSERT INTO kanban_snapshot(external_id,title,status_raw,status,state_class,assignee,updated_raw,fetched) VALUES(?,?,?,?,?,?,?,?)',
+                      [(r['external_id'], r['title'], r['status_raw'], r['status'], r['state_class'], r['assignee'], r['updated_raw'], now) for r in rows])
+        state_counts, status_counts, class_counts = {}, {}, {}
+        for r in rows:
+            state_counts[r['status_raw']] = state_counts.get(r['status_raw'], 0) + 1
+            class_counts[r['state_class']] = class_counts.get(r['state_class'], 0) + 1
+            if r['status']:
+                status_counts[r['status']] = status_counts.get(r['status'], 0) + 1
+        meta.update(last_success_at=now, snapshot_board=board, snapshot_pinned=bool(board), state_counts=state_counts, status_counts=status_counts, class_counts=class_counts,
+                    **{k: result[k] for k in ('received', 'rejected', 'archived_skipped', 'duplicates', 'unique', 'stored', 'dropped', 'truncated')})
     c.execute('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)', ('kanban', json.dumps(meta)))
-    event(c, now, {'connected': 'Hermes Kanban read (read-only)', 'not_connected': 'Hermes Kanban not connected', 'failed': 'Hermes Kanban read failed'}[status], 'error' if status == 'failed' else 'connection')
+    if manual or previous != result['status']:
+        kept = ' (showing the last good read)' if meta['last_success_at'] and result['status'] != 'connected' else ''
+        event(c, now, {'connected': 'Hermes Kanban read (read-only)', 'not_connected': 'Hermes Kanban not connected', 'failed': 'Hermes Kanban read failed'}[result['status']] + kept,
+              'error' if result['status'] == 'failed' else 'connection')
     return meta
