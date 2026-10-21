@@ -4,7 +4,7 @@ Scope: one trustworthy **local** release. Loopback only, no deployment, no paid 
 
 ## Verdict
 
-**Not ready to activate against production yet.** The code is ready for you to verify on the Mac. Activation stays blocked until the four Mac steps below are done and reviewed:
+**Not ready to activate against production yet.** The code is ready for you to verify on the Mac, and five of seven independent review lenses have not run yet. Activation stays blocked until the four Mac steps below are done and reviewed:
 
 1. `tools/probe_hermes_kanban.py` passes against your real Hermes **on this commit** (the 31-record run was on the earlier adapter).
 2. `db_tool.py backup`, `restore-test` and `migrate-check` pass on the **production** database, with a second backup copy off the Mac's disk.
@@ -13,26 +13,30 @@ Scope: one trustworthy **local** release. Loopback only, no deployment, no paid 
 
 Only then: `python3 local-os/server.py --migrate`.
 
-## Results recorded for this branch (cloud sandbox, 20 October 2026)
+## Results recorded for code commit b9bd4c3 (cloud sandbox, 21 October 2026)
 
-Self-contained suite, `python3 -m unittest discover -s local-os/tests`, with Playwright 1.56 and Chromium present, so the browser tests ran (none skipped):
+This documentation commit changes no code. Self-contained suite, `python3 -m unittest discover -s local-os/tests`, with Playwright 1.56 and Chromium present, so the browser tests ran (none skipped):
 
 | File | Run | Passed | Failed | Errors | Skipped |
 | --- | --- | --- | --- | --- | --- |
-| test_agents_api | 47 | 47 | 0 | 0 | 0 |
+| test_agents_api | 50 | 50 | 0 | 0 | 0 |
 | test_agents_ui (browser) | 14 | 14 | 0 | 0 | 0 |
-| test_agents_ui_truth (browser) | 16 | 16 | 0 | 0 | 0 |
-| test_db_tool | 18 | 18 | 0 | 0 | 0 |
+| test_agents_ui_truth (browser) | 19 | 19 | 0 | 0 | 0 |
+| test_db_tool | 27 | 27 | 0 | 0 | 0 |
 | test_existing_features | 4 | 4 | 0 | 0 | 0 |
-| test_kanban_truth | 33 | 33 | 0 | 0 | 0 |
-| test_links_and_gate | 27 | 27 | 0 | 0 | 0 |
-| test_migrations | 34 | 34 | 0 | 0 | 0 |
-| test_tools | 5 | 5 | 0 | 0 | 0 |
-| **Total** | **198** | **198** | **0** | **0** | **0** |
+| test_kanban_truth | 42 | 42 | 0 | 0 | 0 |
+| test_links_and_gate | 28 | 28 | 0 | 0 | 0 |
+| test_migrations | 40 | 40 | 0 | 0 | 0 |
+| test_tools | 6 | 6 | 0 | 0 | 0 |
+| **Total** | **230** | **230** | **0** | **0** | **0** |
 
 `verify.py`: 67 of 67 checks passed, against the **stub** Hermes CLI and a synthetic HOME. That is not a real-model result.
 
-Independent review: a requirements check against the handoff marked 16 of 21 requirements as only partly met. Every gap that code can close is fixed and has a test: structural schema conflicts (same column names, different types or constraints), rows completed before the gate, a truthful Connections row, a snapshot relabelled by a failed read under a new instance, a double count when the board pin is lost, truncation explained in link messages, ClickUp identity, idempotent task creation, preview isolation from your real documents and cleanup on SIGTERM, and the preserve script rewriting `.git/index`. What remains open needs the Mac (the four steps above). The seven code reviewers did not finish (usage limit) and are being re-run; their outcome is not included here.
+## Independent review so far
+
+- **Requirements check, two passes.** Every gap that code can close is fixed and tested. What remains needs the Mac (the four steps above) or the other workspace's code.
+- **Code review, seven reviewers with one lens each.** Twice cut short by a usage limit. Two reviewers finished: migrations and database, and Kanban truthfulness. They reported 14 findings. Their verifiers did not run, so each finding was reproduced by hand before fixing. All 14 were real, and all are fixed with a test: path characters bypassing the `--migrate` gate, hot-journal and foreign-key crashes, views holding table names, quarantine re-parenting foreign rows, instance relabelling, unreadable timestamps, unrecorded refresh failures, and four wording problems.
+- **Not yet reviewed:** five reviewers did not run (security, front end, tools and docs, concurrency, approval and provenance). This release has not had an independent pass through those lenses.
 
 ## Evidence classes
 
@@ -57,6 +61,7 @@ python3 local-os/tools/db_tool.py inspect --db <production db>
 python3 local-os/tools/db_tool.py backup  --db <production db> --out <a folder on another drive>
 python3 local-os/tools/db_tool.py restore-test --backup <backup file> --db <production db>
 python3 local-os/tools/db_tool.py migrate-check --db <production db>
+python3 local-os/tools/db_tool.py restore --backup <backup file> --db <production db>   # dry run: how you would roll back
 python3 local-os/tools/preview.py                        # isolated preview: prints a 127.0.0.1 URL and the commit
 python3 local-os/verify.py                               # real Hermes and model calls; may incur usage
 ```
@@ -65,7 +70,7 @@ The preview URL works only on the computer that runs it. A URL from the cloud sa
 
 ## Known limits
 
-- **Hermes facts not yet confirmed on real Hermes.** Its JSON field names are undocumented: the parser needs only an id and a title per record, and the probe prints the field names it saw. What `--board <name>` does with a board that does not exist is undocumented, so the board label shows the **configured** name; a successful read of a wrongly named board would be labelled with that name. Whether `hermes kanban list` caps its own output is undocumented; a Hermes-side cap would look like a complete read.
+- **Hermes facts not yet confirmed on real Hermes.** Its JSON field names are undocumented: the parser needs only an id and a title per record, and the probe prints the field names it saw. What `--board <name>` does with a board that does not exist is undocumented, so the board label shows the **configured** name. The probe checks the name appears in `hermes kanban boards list`; the server does not, because that output format is undocumented too. Whether `hermes kanban list` caps its own output is undocumented; a Hermes-side cap would look like a complete read.
 - Reads are periodic (default every 5 minutes, `KEYSTAL_OS_KANBAN_REFRESH_SECONDS`, `0` = startup only) plus on demand. They prove a read, not worker liveness.
 - The instance label (`KEYSTAL_OS_HERMES_INSTANCE`) is a name you choose; it does not select anything in Hermes.
 - You can opt a task out of review and complete it without evidence. This is recorded and shown, and deliberately not blocked.
