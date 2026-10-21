@@ -86,6 +86,14 @@ def startup_checks():
 def init(migrate_ok=False):
     """Open the database. A database that already holds data is only migrated on an explicit --migrate."""
     state = migrations.plan(DB)
+    if state.get('needs_recovery'):
+        # A writer died mid-transaction (power loss, kill, Ctrl+C during a write). SQLite rolls the interrupted
+        # transaction back on any read-write open; the original server did this implicitly on every start.
+        result = migrations.recover(DB)
+        print(f'NOTE: {DB} had an interrupted transaction; SQLite rolled it back (integrity_check: {result}).', file=sys.stderr)
+        state = migrations.plan(DB)
+    if state.get('invalid_version'):
+        refuse(f"{DB} has user_version {state['current']}, which this code never writes. Refusing to open it. Nothing was changed.")
     if state.get('newer_than_code'):
         refuse(f"{DB} is schema v{state['current']}, newer than this Keystal OS (v{state['latest']}). Refusing to open it.")
     if state['conflicts']:
@@ -135,19 +143,27 @@ def getstate():
 class BadRequest(ApiError):
     pass
 
+BUSY_READ = object()
+
 def refresh_kanban(manual=False):
-    """Read-only refresh of the Hermes Kanban snapshot. Returns the stored read bookkeeping, or None if a read is already running.
-    The configured board is used exactly as named; it is never replaced by a default."""
+    """Read-only refresh of the Hermes Kanban snapshot. Returns the stored read bookkeeping, or BUSY_READ if a read is
+    already running. The configured board is used exactly as named; it is never replaced by a default. Anything that
+    goes wrong is recorded as a failed attempt (the last good snapshot is kept), never silently dropped."""
     if not KANBAN_BUSY.acquire(blocking=False):
-        return None
+        return BUSY_READ
+    board = KANBAN_BOARD or None
     try:
-        board = KANBAN_BOARD or None
         result = agent_tasks.fetch_kanban(HERMES, board)
         with connect() as c:
             return agent_tasks.store_kanban(c, now(), result, board, HERMES_INSTANCE, manual)
     except Exception:
         traceback.print_exc()
-        return None
+        try:
+            with connect() as c:
+                return agent_tasks.store_kanban(c, now(), {'status': 'failed', 'detail': 'Hermes Kanban data could not be read or stored (unexpected content). The last good read is kept; nothing was changed in Hermes.'}, board, HERMES_INSTANCE, manual)
+        except Exception:
+            traceback.print_exc()
+            return None
     finally:
         KANBAN_BUSY.release()
 
@@ -288,7 +304,7 @@ class Handler(BaseHTTPRequestHandler):
                 code, payload = agent_tasks.ROUTES[path](c, now(), data)
             return self.send(code, payload)
         if path == '/api/kanban/refresh':
-            if refresh_kanban(manual=True) is None:
+            if refresh_kanban(manual=True) is BUSY_READ:
                 return self.send(409, {'error': 'A Kanban read is already running.'})
             with connect() as c:
                 return self.send(200, agent_tasks.kanban_view(c, now()))

@@ -245,5 +245,128 @@ class Quarantine(ToolCase):
         self.assertEqual((code, report['executed']), (0, False))
 
 
+class ReviewFindings(ToolCase):
+    def test_a_hot_journal_is_reported_with_instructions_not_a_traceback(self):
+        migrations.migrate(self.db)
+        import subprocess
+        code = f"""import sqlite3,os
+c=sqlite3.connect({str(self.db)!r},isolation_level=None); c.execute('PRAGMA cache_size=1'); c.execute('BEGIN IMMEDIATE')
+for i in range(3000): c.execute("INSERT INTO events(kind,label,created) VALUES('x',?,'n')",('y'*200,))
+os._exit(9)"""
+        subprocess.run([sys.executable, '-c', code])
+        for cmd in (['inspect'], ['backup', '--out', str(self.dir / 'bk')], ['migrate-check'], ['quarantine']):
+            code_, report = run(*cmd, '--db', str(self.db))
+            self.assertEqual(code_, 3, cmd)
+            self.assertIn('NEEDS RECOVERY', report['result'])
+        self.assertTrue(Path(str(self.db) + '-journal').exists(), 'the tool did not touch the journal')
+
+    def test_quarantine_refuses_when_foreign_keys_elsewhere_point_at_the_table(self):
+        c = sqlite3.connect(self.db)
+        for statement in migrations.MIGRATIONS[0][1]:
+            c.execute(statement)
+        c.executescript("""CREATE TABLE agents(id TEXT PRIMARY KEY,name TEXT NOT NULL,kind TEXT,status TEXT);
+            CREATE TABLE tasks(id TEXT PRIMARY KEY,title TEXT NOT NULL,status TEXT NOT NULL,agent_id TEXT REFERENCES agents(id),review TEXT);
+            INSERT INTO agents VALUES('claude','Claude (foreign row)','api','ok'); INSERT INTO tasks VALUES('f1','Foreign task','completed','claude','pending');""")
+        c.close()
+        before = file_hash(self.db)
+        code, report = run('quarantine', '--db', str(self.db), '--out', str(self.dir / 'bk'), '--execute')
+        self.assertEqual((code, report['executed']), (3, False))
+        self.assertIn('tasks.agent_id -> agents', json.dumps(report['refused']))
+        self.assertEqual(file_hash(self.db), before)
+
+    def test_quarantine_never_moves_the_owners_own_altered_table(self):
+        pr_v2_db(self.db)
+        c = sqlite3.connect(self.db)
+        c.execute('ALTER TABLE agent_tasks ADD COLUMN surprise TEXT')
+        c.commit(); c.close()
+        code, report = run('inspect', '--db', str(self.db))
+        self.assertIn('altered keystal schema', report['classification'])
+        before = file_hash(self.db)
+        code, report = run('quarantine', '--db', str(self.db), '--execute')
+        self.assertEqual((code, report['executed']), (3, False))
+        self.assertIn('would hide your own data', json.dumps(report['refused']))
+        self.assertEqual(file_hash(self.db), before)
+
+    def test_quarantine_refuses_a_view_holding_a_table_name(self):
+        pr_v2_db(self.db)
+        c = sqlite3.connect(self.db)
+        c.execute('CREATE VIEW projects AS SELECT DISTINCT lane AS id FROM agent_tasks')
+        c.commit(); c.close()
+        code, report = run('quarantine', '--db', str(self.db), '--execute')
+        self.assertEqual((code, report['executed']), (3, False))
+
+    def test_a_database_with_a_broken_foreign_key_declaration_can_still_be_inspected(self):
+        c = sqlite3.connect(self.db)
+        for statement in migrations.MIGRATIONS[0][1]:
+            c.execute(statement)
+        c.execute('CREATE TABLE agents(id TEXT PRIMARY KEY,name TEXT NOT NULL,kind TEXT)')
+        c.execute('CREATE TABLE tasks(id TEXT PRIMARY KEY,title TEXT,agent_name TEXT REFERENCES agents(name))')
+        c.commit(); c.close()
+        code, report = run('inspect', '--db', str(self.db))
+        self.assertEqual(code, 3)
+        self.assertIn('foreign key mismatch', report['invariants']['foreign_key_check_error'])
+
+
+class Restore(ToolCase):
+    def setUp(self):
+        super().setUp()
+        import socket
+        with socket.socket() as sock:  # a port nothing listens on, so the 'server running' guard is not tripped by accident
+            sock.bind(('127.0.0.1', 0))
+            self.port = sock.getsockname()[1]
+        os.environ['KEYSTAL_OS_PORT'] = str(self.port)
+        self.addCleanup(os.environ.pop, 'KEYSTAL_OS_PORT', None)
+
+    def backed_up_then_migrated(self):
+        pr_v2_db(self.db)
+        _, report = run('backup', '--db', str(self.db), '--out', str(self.dir / 'bk'))
+        migrations.migrate(self.db)
+        return Path(report['backup'])
+
+    def test_dry_run_changes_nothing_and_says_which_code_opens_the_backup(self):
+        backup = self.backed_up_then_migrated()
+        before, files = file_hash(self.db), self.listing()
+        code, report = run('restore', '--backup', str(backup), '--db', str(self.db))
+        self.assertEqual((code, report['executed'], report['backup_schema_version']), (0, False, 2))
+        self.assertIn('PR #1 head e0aea41 opens it as is', report['which_code_opens_it'])
+        self.assertEqual((file_hash(self.db), self.listing()), (before, files))
+
+    def test_execute_rolls_back_to_the_backup_and_keeps_the_replaced_file(self):
+        backup = self.backed_up_then_migrated()
+        migrated = dump(self.db)
+        code, report = run('restore', '--backup', str(backup), '--db', str(self.db), '--execute')
+        self.assertEqual((code, report['executed'], report['problems']), (0, True, []))
+        self.assertEqual(dump(self.db), dump(backup), 'the live database is now exactly the backup')
+        self.assertEqual(dump(report['replaced_file_kept']), migrated, 'the replaced database is kept, not deleted')
+        self.assertEqual(oct(self.db.stat().st_mode & 0o777), '0o600')
+        self.assertEqual(migrations.plan(self.db)['current'], 2)
+
+    def test_refuses_while_a_server_is_listening(self):
+        import socket
+        backup = self.backed_up_then_migrated()
+        before = file_hash(self.db)
+        with socket.socket() as server:
+            server.bind(('127.0.0.1', self.port))
+            server.listen()
+            code, report = run('restore', '--backup', str(backup), '--db', str(self.db), '--execute')
+        self.assertEqual((code, report['executed']), (3, False))
+        self.assertIn('Stop the Keystal server first', report['refused'])
+        self.assertEqual(file_hash(self.db), before)
+
+    def test_refuses_a_backup_that_fails_verification(self):
+        backup = self.backed_up_then_migrated()
+        data = bytearray(backup.read_bytes())
+        for i in range(2048, min(len(data), 2048 + 4096)):
+            data[i] ^= 0xFF
+        backup.write_bytes(bytes(data))
+        before = file_hash(self.db)
+        try:
+            code, report = run('restore', '--backup', str(backup), '--db', str(self.db), '--execute')
+        except sqlite3.DatabaseError:
+            code, report = 3, {'executed': False}
+        self.assertEqual((code, report['executed']), (3, False))
+        self.assertEqual(file_hash(self.db), before)
+
+
 if __name__ == '__main__':
     unittest.main()

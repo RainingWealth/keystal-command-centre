@@ -79,7 +79,18 @@ class ProbeHermesKanban(unittest.TestCase):
         self.assertIn('assignee', report['json_field_names_seen'])
         for secret in ('Synthetic', 'writer', 'coder', 't_001'):
             self.assertNotIn(secret, out.stdout, 'no titles, assignees or ids are printed')
-        self.assertEqual(calls, [['kanban', '--board', 'ops', 'list', '--json']], 'only the read command ran')
+        self.assertEqual(calls, [['kanban', '--board', 'ops', 'list', '--json'], ['kanban', 'boards', 'list']], 'only the two read commands ran')
+
+    def test_checks_the_pinned_board_exists_without_printing_the_board_list(self):
+        out, calls = self.run_probe('--board', 'ops')
+        report = json.loads(out.stdout)
+        self.assertEqual(report['board_in_boards_list'], True)
+        self.assertIn(['kanban', 'boards', 'list'], calls)
+        self.assertNotIn('synthetic', out.stdout.replace('"board": "ops"', ''), 'other board names are not printed')
+        out, _ = self.run_probe('--board', 'nosuchboard')
+        report = json.loads(out.stdout)
+        self.assertEqual((out.returncode, report['board_in_boards_list']), (1, False))
+        self.assertIn('may not be of the board you meant', report['warning'])
 
     def test_failures_exit_nonzero(self):
         self.assertEqual(self.run_probe(mode='missing')[0].returncode, 1)
@@ -95,6 +106,13 @@ class Preview(unittest.TestCase):
             real_docs = Path(home) / 'Keystal/outputs/keystal-os'
             real_docs.mkdir(parents=True)
             (real_docs / 'Keystal OS.md').write_text('Keystal OS\n\nPRIVATE REAL DOCUMENT\n')
+            # A stand-in for the real vault helper the Dropbox check runs from HOME: it must never be executed.
+            helper = Path(home) / '.hermes/skills/rayvern-brain/scripts'
+            helper.mkdir(parents=True)
+            (helper / 'rayvern_brain.py').write_text(f"open({str(Path(home) / 'helper-ran')!r}, 'w').write('ran'); print('Rayvern Brain')\n")
+            venv = Path(home) / '.hermes/hermes-agent/venv/bin'
+            venv.mkdir(parents=True)
+            (venv / 'python').symlink_to(sys.executable)
             env = {**os.environ, 'HOME': home}
             p = subprocess.Popen([sys.executable, str(TOOLS / 'preview.py'), '--port', str(port), '--hermes', 'stub'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, env=env)
             try:
@@ -118,6 +136,9 @@ class Preview(unittest.TestCase):
                 self.assertTrue(all(t['title'].startswith('Synthetic') for t in state['agent_tasks']))
                 doc = c.request('/api/doc/manual')[1]
                 self.assertNotIn('PRIVATE REAL DOCUMENT', json.dumps(doc), 'the preview never shows the real saved documents')
+                check = c.request('/api/check/dropbox', {})[1]
+                self.assertEqual(check['status'], 'failed', 'the preview cannot reach the real vault helper under your HOME')
+                self.assertFalse((Path(home) / 'helper-ran').exists())
                 p.send_signal(signal.SIGTERM)
                 p.wait(timeout=15)
                 time.sleep(.5)

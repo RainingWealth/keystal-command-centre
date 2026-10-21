@@ -13,7 +13,9 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import shutil
+import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -44,8 +46,20 @@ def main(argv=None):
             summary['mapped_status_counts'][r['status']] = summary['mapped_status_counts'].get(r['status'], 0) + 1
         elif r['status_raw'] not in summary['unmapped_raw_states']:
             summary['unmapped_raw_states'].append(r['status_raw'])
+    if board and hermes:
+        # Hermes's docs do not say what `--board <name>` does for a board that does not exist, so check the board list.
+        # Prints only whether the name appears, never the list itself.
+        try:
+            r = subprocess.run([hermes, 'kanban', 'boards', 'list'], stdin=subprocess.DEVNULL, capture_output=True, text=True, errors='replace', timeout=args.timeout)
+            listed = None if r.returncode else bool(re.search(r'(?<![a-z0-9_-])' + re.escape(board) + r'(?![a-z0-9_-])', r.stdout))
+        except (OSError, subprocess.TimeoutExpired):
+            listed = None
+        summary['board_in_boards_list'] = listed if listed is not None else 'unknown (hermes kanban boards list did not run)'
+        summary['commands_run'].append('hermes kanban boards list')
+        if listed is False:
+            summary['warning'] = f'The board {board!r} is not in `hermes kanban boards list`: the read above may not be of the board you meant.'
     print(json.dumps(summary, indent=2))
-    return 0 if result['status'] == 'connected' else 1
+    return 0 if result['status'] == 'connected' and summary.get('board_in_boards_list') is not False else 1
 
 
 if __name__ == '__main__':

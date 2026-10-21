@@ -8,6 +8,8 @@ nothing here modifies a database except `quarantine --execute`, which backs up f
   restore-test   restore a backup into a scratch file, verify it, dry-run the migrations on it
   migrate-check  copy the live database to scratch, apply pending migrations there, prove no row is lost
   quarantine     move another implementation's conflicting tables aside (dry run unless --execute)
+  restore        put a verified backup back in place of the live database (dry run unless --execute);
+                 the replaced file is renamed, never deleted, and the server must be stopped
 
 All commands print JSON. Exit 0 = fine, 3 = a check failed or action needed, 2 = usage error.
 """
@@ -19,6 +21,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import socket
 import sqlite3
 import sys
 import tempfile
@@ -37,11 +40,15 @@ def stamp():
     return dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
 
 
+class NeedsRecovery(Exception):
+    pass
+
+
 def open_ro(db):
     db = Path(db).resolve()
     if not db.is_file():
         raise SystemExit(f'No such database: {db}')
-    return sqlite3.connect(f'{db.as_uri()}?mode=ro', uri=True, timeout=15)
+    return sqlite3.connect(migrations.ro_uri(db), uri=True, timeout=15)
 
 
 def qi(name):
@@ -85,6 +92,10 @@ def classify(c, plan):
     tables = tables_of(c)
     if not tables:
         return 'empty'
+    if plan.get('invalid_version'):
+        return f"unknown: user_version {plan['current']} is not one Keystal writes"
+    if any(x['kind'] == 'altered' for x in plan['conflicts']):
+        return 'altered keystal schema: a table this version owns was changed or removed (not another implementation; needs manual review)'
     if plan['conflicts']:
         return 'conflicting: tables from another implementation'
     version = plan['current']
@@ -250,10 +261,17 @@ def _referencing_sql(c, names, skip_tables):
 def cmd_quarantine(args):
     db = Path(args.db)
     plan = migrations.plan(db)
-    table_conflicts = [c for c in plan['conflicts'] if c['declared_columns'] is not None or c['live_columns'] is not None]
-    object_conflicts = [c for c in plan['conflicts'] if c['live_columns'] is None and c['declared_columns'] is None]
     if not plan['conflicts']:
         return {'database': str(db.resolve()), 'result': 'Nothing to quarantine: no schema conflict.', 'executed': False}, 0
+    own = [c for c in plan['conflicts'] if c['kind'] in ('altered', 'namespace')]
+    if own:
+        return {'database': str(db.resolve()), 'executed': False, 'conflicts': plan['conflicts'],
+                'refused': ['Quarantine only moves tables that ANOTHER implementation created under names a pending migration needs. '
+                            'These conflicts are not that: a table this schema version already owns was changed or removed, or a view/index '
+                            'holds a table name. Moving them would hide your own data. Review them by hand (inspect lists the columns).',
+                            [c['name'] + ': ' + c['reason'] for c in own]]}, 3
+    table_conflicts = [c for c in plan['conflicts'] if c['kind'] == 'preexisting']
+    object_conflicts = [c for c in plan['conflicts'] if c['kind'] == 'object']
     suffix = dt.datetime.now(dt.timezone.utc).strftime('%Y%m%d')
     c = open_ro(db)
     try:
@@ -262,6 +280,9 @@ def cmd_quarantine(args):
         rename = {n: f'quarantined_{n}_{suffix}' for n in names if n in live}
         clash = [new for new in rename.values() if new in live]
         outside = _referencing_sql(c, names, names) if names else []
+        # Foreign keys elsewhere that point at a table we would rename would silently re-point at the NEW table of that
+        # name after migration (SQLite resolves REFERENCES by name). Refuse instead of re-parenting someone's rows.
+        fk_refs = sorted({f'{t}.{fk[3]} -> {fk[2]}' for t in live if t not in names for fk in c.execute(f'PRAGMA foreign_key_list({qi(t)})') if fk[2] in names})
         owned = {r[0]: (r[1], r[2]) for r in c.execute("SELECT name,type,sql FROM sqlite_master WHERE type IN ('index','trigger') AND tbl_name IN (%s) AND sql IS NOT NULL" % ','.join('?' * len(names)), names)} if names else {}
         stray = {x['name'] for x in object_conflicts} - set(owned)
     finally:
@@ -274,6 +295,8 @@ def cmd_quarantine(args):
         blockers.append(f'target name(s) already exist: {clash}')
     if outside:
         blockers.append(f'views/triggers on other tables mention these tables and need manual review: {sorted(outside)}')
+    if fk_refs:
+        blockers.append(f'foreign keys in other tables point at these tables and would silently re-point at the new tables of the same name: {fk_refs}')
     if blockers:
         report['refused'] = blockers
         return report, 3
@@ -315,8 +338,70 @@ def cmd_quarantine(args):
     os.chmod(saved, 0o600)
     after = plan_after = migrations.plan(db)
     report.update(executed=True, backup=str(backup_path), backup_verified=verified, saved_definitions=str(saved), conflicts_remaining=after['conflicts'],
-                  result='Quarantined. Run migrate-check, then start the server with --migrate.')
+                  result='Quarantined. Run migrate-check, then start the server with --migrate.' if not after['conflicts'] else 'Quarantined the foreign tables, but conflicts remain (listed). Do not migrate yet.')
     return report, 3 if plan_after['conflicts'] else 0
+
+
+SCHEMA_CODE = {0: 'the original app (main 3735b38) opens it as is; this branch opens it only after --migrate',
+               2: 'PR #1 head e0aea41 opens it as is; this branch opens it only after --migrate',
+               3: 'this branch (corrective pass) opens it as is; PR #1 head e0aea41 and the original app cannot'}
+
+
+def server_listening():
+    port = int(os.environ.get('KEYSTAL_OS_PORT', '8766'))
+    with socket.socket() as s:
+        s.settimeout(0.5)
+        return port if s.connect_ex(('127.0.0.1', port)) == 0 else None
+
+
+def cmd_restore(args):
+    """Roll back: replace the live database with a backup. Verifies the backup first, keeps the replaced file."""
+    db, backup = Path(args.db).resolve(), Path(args.backup).resolve()
+    if not backup.is_file():
+        raise SystemExit(f'No such backup: {backup}')
+    scratch = Path(tempfile.mkdtemp(prefix='keystal-restore-'))
+    os.chmod(scratch, 0o700)
+    try:
+        check = scratch / 'check.sqlite3'
+        expected, version = online_backup(backup, check)
+        verified, problems = verify_copy(check, expected, version)
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+    stamp_ = stamp()
+    moved = db.with_name(f'{db.stem}.replaced-{stamp_}{db.suffix}')
+    report = {'database': str(db), 'backup': str(backup), 'backup_verified': verified, 'problems': problems,
+              'backup_schema_version': version, 'which_code_opens_it': SCHEMA_CODE.get(version, 'unknown schema version'),
+              'would_rename_current_to': str(moved) if db.exists() else None, 'executed': False}
+    if problems:
+        report['refused'] = 'The backup failed verification; nothing was changed.'
+        return report, 3
+    port = server_listening()
+    if port:
+        report['refused'] = f'Something is listening on 127.0.0.1:{port}. Stop the Keystal server first (Ctrl+C), then run this again. Nothing was changed.'
+        return report, 3
+    if not args.execute:
+        report['result'] = 'Dry run. Stop the server, then re-run with --execute. The current database is renamed (kept), never deleted.'
+        return report, 0
+    if db.exists():
+        c = sqlite3.connect(db, timeout=0)
+        try:
+            c.execute('BEGIN EXCLUSIVE')
+            c.execute('ROLLBACK')
+        except sqlite3.OperationalError:
+            report['refused'] = 'The database is in use by another process. Stop the server first. Nothing was changed.'
+            return report, 3
+        finally:
+            c.close()
+        db.rename(moved)
+        for suffix in ('-journal', '-wal', '-shm'):
+            side = Path(str(db) + suffix)
+            if side.exists():
+                side.rename(Path(str(moved) + suffix))
+    expected, version = online_backup(backup, db)
+    verified, problems = verify_copy(db, expected, version)
+    report.update(executed=True, restored_rows=verified['rows'], problems=problems, replaced_file_kept=str(moved) if moved.exists() else None,
+                  result='Restored. Start the code version listed above.' if not problems else 'Restored file failed verification: the replaced file is kept; put it back by renaming.')
+    return report, 3 if problems else 0
 
 
 def main(argv=None):
@@ -330,12 +415,23 @@ def main(argv=None):
             p.add_argument('--out', help='directory for backups (default: backups/ next to the database)')
         if name == 'quarantine':
             p.add_argument('--execute', action='store_true', help='apply the plan (default is a dry run)')
+    p = sub.add_parser('restore')
+    p.add_argument('--backup', required=True)
+    p.add_argument('--db', default=str(default_db()), help='the live database to replace (default: the Keystal OS workbench database)')
+    p.add_argument('--execute', action='store_true', help='apply (default is a dry run)')
     p = sub.add_parser('restore-test')
     p.add_argument('--backup', required=True)
     p.add_argument('--db', help='optionally compare row counts with this live database (read-only)')
     p.add_argument('--keep', action='store_true', help='keep the scratch copy and print its path')
     args = parser.parse_args(argv)
-    report, code = {'inspect': cmd_inspect, 'backup': cmd_backup, 'restore-test': cmd_restore_test, 'migrate-check': cmd_migrate_check, 'quarantine': cmd_quarantine}[args.cmd](args)
+    try:
+        for path in (getattr(args, 'db', None), getattr(args, 'backup', None)):
+            if path and Path(path).is_file() and migrations.needs_recovery(path):
+                raise NeedsRecovery(str(Path(path).resolve()))
+        report, code = {'inspect': cmd_inspect, 'backup': cmd_backup, 'restore-test': cmd_restore_test, 'migrate-check': cmd_migrate_check, 'quarantine': cmd_quarantine, 'restore': cmd_restore}[args.cmd](args)
+    except NeedsRecovery as exc:
+        report, code = {'database': str(exc), 'result': 'NEEDS RECOVERY: an interrupted transaction left a -journal file. This tool opens databases read-only and cannot roll it back. '
+                        'Start the Keystal server once (it lets SQLite roll the transaction back, as any normal open does), then run this command again. Nothing was changed.'}, 3
     print(json.dumps(report, indent=2))
     return code
 

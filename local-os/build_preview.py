@@ -17,7 +17,7 @@ AGENTS = [('Hermes', 'Local operator · Ask Keystal bridge'), ('ChatGPT', 'Gener
 agent_cards = ''.join(f'<article class="agent-card"><div class="agent-head"><div><h3>{name}</h3><small>{role}</small></div><span class="badge pending">PREVIEW ONLY</span></div><p class="agent-live muted">No live status here. No agent is connected to this page and no task data is published.</p></article>' for name, role in AGENTS)
 html = html.replace('<div id="agent-overview" class="agent-overview"></div>', f'<div class="agent-overview"><p class="footnote attention">Layout only. The working local app shows each agent\'s real connection status and the tasks you track.</p><div class="agent-grid">{agent_cards}</div></div>')
 html = html.replace('<div class="desk-list" id="desk-list"></div>', '<div class="empty-desk"><strong>No private workspace data is published.</strong><p>This preview deliberately has no tasks, conversations, client information or pipeline figures.</p></div>')
-html = html.replace('Captures are local drafts. ClickUp remains the execution record.', 'Capture controls are disabled here. The working local app stores drafts on the Mac.')
+html = html.replace('Captures are local drafts. ClickUp holds business commitments; nothing here is sent to it.', 'Capture controls are disabled here. The working local app stores drafts on the Mac.')
 
 def section(name, body):
     global html

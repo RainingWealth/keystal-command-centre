@@ -69,7 +69,7 @@ class Client:
 
 class Server:
     """Context manager. `hermes=False` points the app at a path that does not exist (no Hermes installed)."""
-    def __init__(self, hermes=True, extra_env=None, data=None, args=()):
+    def __init__(self, hermes=True, extra_env=None, data=None, args=(), kanban_mode='ok'):
         self.hermes = hermes
         self.args = list(args)
         self.extra_env = extra_env or {}
@@ -80,9 +80,10 @@ class Server:
         self.base = f'http://127.0.0.1:{self.port}'
         self.process = None
         (self.control / 'kanban.json').write_text(json.dumps(SYNTHETIC_KANBAN))
-        (self.control / 'mode').write_text('ok')
+        (self.control / 'mode').write_text(kanban_mode)
         self.docs = self.control / 'documents'  # synthetic saved documents: tests never read the owner's real ~/Keystal files
         self.docs.mkdir()
+        (self.control / 'home').mkdir()
         (self.docs / 'Keystal OS.md').write_text('Keystal OS\n\nSynthetic operating manual used only by tests.\n')
 
     @property
@@ -90,7 +91,8 @@ class Server:
         return {**os.environ, 'KEYSTAL_OS_DATA': str(self.data), 'KEYSTAL_OS_PORT': str(self.port),
                 'KEYSTAL_OS_HERMES': str(FAKE_HERMES) if self.hermes else str(self.control / 'no-such-hermes'),
                 'FAKE_HERMES_KANBAN_JSON': str(self.control / 'kanban.json'), 'FAKE_HERMES_MODE_FILE': str(self.control / 'mode'),
-                'FAKE_HERMES_LOG': str(self.control / 'hermes.log'), 'FAKE_HERMES_STATE': str(self.control), 'KEYSTAL_OS_DOCROOT': str(self.docs), **self.extra_env}
+                'FAKE_HERMES_LOG': str(self.control / 'hermes.log'), 'FAKE_HERMES_STATE': str(self.control), 'KEYSTAL_OS_DOCROOT': str(self.docs),
+                'HOME': str(self.control / 'home'), **self.extra_env}  # a throwaway HOME: tests never reach ~/.hermes or ~/Keystal
 
     def set_kanban_mode(self, mode):
         (self.control / 'mode').write_text(mode)

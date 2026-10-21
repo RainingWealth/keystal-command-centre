@@ -412,5 +412,133 @@ class InstanceAndPinChanges(unittest.TestCase):
         self.assertEqual(b['in_tiles'] + b['done'] + b['scheduled'] + b['unknown'], b['board_only'])
 
 
+class ReviewFindings(unittest.TestCase):
+    def test_hermes_text_that_cannot_be_encoded_is_cleaned_and_the_read_is_recorded(self):
+        with Server(extra_env={'KEYSTAL_OS_KANBAN_BOARD': 'ops'}) as s:
+            c = s.client()
+            (s.control / 'kanban.json').write_text('[{"id":"t_009","title":"Broken emoji \\ud83d","status":"todo","assignee":"\\udc00x"}]')
+            code, view = c.post('/api/kanban/refresh', {})
+            self.assertEqual((code, view['status'], view['counts']['stored']), (200, 'connected', 1))
+            self.assertEqual(view['tasks'][0]['title'], 'Broken emoji ?')
+
+    def test_deeply_nested_output_is_a_recorded_failure_not_a_busy_message(self):
+        with Server(extra_env={'KEYSTAL_OS_KANBAN_BOARD': 'ops'}) as s:
+            c = s.client()
+            (s.control / 'kanban.json').write_text('[{"id":"t","title":"x","meta":' + '[' * 100000 + ']' * 100000 + '}]')
+            before = c.state()['kanban']['last_attempt_at']
+            code, view = c.post('/api/kanban/refresh', {})
+            self.assertEqual((code, view['status']), (200, 'failed'))
+            self.assertNotEqual(view['last_attempt_at'], before)
+            self.assertEqual(len(view['tasks']), 4, 'the last good read is kept')
+
+    def test_an_unexpected_error_during_a_read_is_recorded_as_a_failed_attempt(self):
+        import subprocess, tempfile
+        d = tempfile.mkdtemp()
+        code = """import agent_tasks, server
+server.init()
+def boom(*a, **k): raise KeyError('unexpected')
+agent_tasks.fetch_kanban = boom
+meta = server.refresh_kanban(manual=True)
+print(meta['last_attempt_status'], meta['last_attempt_detail'][:40])"""
+        out = subprocess.run([sys.executable, '-c', code], cwd=str(Path(__file__).resolve().parent.parent), capture_output=True, text=True,
+                             env={**os.environ, 'KEYSTAL_OS_DATA': d, 'KEYSTAL_OS_HERMES': '/nonexistent', 'KEYSTAL_OS_DOCROOT': d})
+        self.assertEqual(out.stdout.strip(), 'failed Hermes Kanban data could not be read or', out.stderr[-500:])
+
+    def test_relabelling_the_instance_never_double_counts_or_double_links(self):
+        with Server(extra_env={'KEYSTAL_OS_KANBAN_BOARD': 'ops'}) as s:
+            c = s.client()
+            a = c.post('/api/agent-tasks', {'title': 'A', 'agent_id': 'hermes'})[1]['id']
+            c.post('/api/agent-tasks/status', {'id': a, 'status': 'running'})
+            c.post('/api/agent-tasks/link', {'id': a, 'provider': 'hermes_kanban', 'external_id': 't_002'})
+            s.extra_env['KEYSTAL_OS_HERMES_INSTANCE'] = 'macbook'
+            s.restart()
+            c = s.client()
+            hermes = c.state()['agents']['agents'][0]
+            self.assertEqual((hermes['counts']['running'], hermes['board']['ambiguous']), (1, 1))
+            b = c.post('/api/agent-tasks', {'title': 'B', 'agent_id': 'hermes'})[1]['id']
+            code, data = c.post('/api/agent-tasks/link', {'id': b, 'provider': 'hermes_kanban', 'external_id': 't_002'})
+            self.assertEqual(code, 409)
+            self.assertIn("instance label 'local'", data['error'])
+            self.assertEqual(c.request('/api/agent-tasks/' + a)[1]['refs'][0]['board_record']['reason'], 'other_instance')
+
+    def test_unreadable_stored_times_never_take_the_dashboard_down(self):
+        for bad in ('2026-10-20T08:00:00', 'not a date', None, 12345):
+            c = db()
+            c.execute("INSERT OR REPLACE INTO meta VALUES('kanban', ?)", (json.dumps({'last_attempt_at': bad, 'last_attempt_status': 'failed', 'last_attempt_detail': 'x', 'last_success_at': bad}),))
+            c.commit()
+            v = agent_tasks.kanban_view(c, T0)
+            if bad is not None:
+                self.assertEqual((v['stale'], v['time_unreadable'], v['age_seconds']), (True, True, None), bad)
+            c.close()
+        c = db()
+        c.execute('BEGIN IMMEDIATE')
+        tid = agent_tasks.create_task(c, T0, {'title': 'x', 'agent_id': 'codex'})[1]['id']
+        c.execute("UPDATE agent_tasks SET status='running',updated='2026-10-01T00:00:00' WHERE id=?", (tid,))
+        c.commit()
+        agent_tasks.sweep_stale(c, T0)  # a naive timestamp is skipped, not a crash
+        c.close()
+
+    def test_the_view_tasks_button_counts_tracked_tasks_only(self):
+        c = db()
+        self.addCleanup(c.close)
+        agent_tasks.store_kanban(c, T0, agent_tasks.parse_kanban([rec(1, 'running'), rec(2, 'todo'), rec(3, 'blocked')]), 'ops', 'local')
+        c.commit()
+        c.execute('BEGIN IMMEDIATE')
+        agent_tasks.create_task(c, T0, {'title': 'Tracked', 'agent_id': 'hermes'})
+        c.commit()
+        hermes = agent_tasks.overview(c, {'bridge_available': True, 'busy': False}, agent_tasks.kanban_view(c, T0))['agents'][0]
+        self.assertEqual((hermes['open'], hermes['tracked_open']), (4, 1))
+
+    def test_compare_reasons_are_specific(self):
+        c = db()
+        self.addCleanup(c.close)
+        c.execute('BEGIN IMMEDIATE')
+        tid = agent_tasks.create_task(c, T0, {'title': 'Tracked', 'agent_id': 'hermes'})[1]['id']
+        c.execute("INSERT INTO external_refs(task_id,provider,instance,scope,external_id,source,created) VALUES(?,'hermes_kanban','local','ops','t1','manual','n')", (tid,))
+        c.commit()
+        reason = lambda: agent_tasks.task_detail(c, tid)['refs'][0]['board_record']['reason']
+        self.assertEqual(reason(), 'no_read')
+        agent_tasks.store_kanban(c, T0, agent_tasks.parse_kanban([rec(1)]), None, 'local'); c.commit()
+        self.assertEqual(reason(), 'unpinned')
+        agent_tasks.store_kanban(c, T0, agent_tasks.parse_kanban([rec(1)]), 'other', 'local'); c.commit()
+        self.assertEqual(reason(), 'other_board')
+        agent_tasks.store_kanban(c, T0, agent_tasks.parse_kanban([rec(1)]), 'ops', 'local'); c.commit()
+        self.assertIsNone(reason())
+
+    def test_counts_recorded_by_the_earlier_version_are_unknown_not_invented(self):
+        c = db()
+        self.addCleanup(c.close)
+        c.execute("INSERT OR REPLACE INTO meta VALUES('kanban', ?)", (json.dumps({'status': 'connected', 'detail': 'Read 350 tasks', 'checked_at': T0, 'count': 200}),))
+        c.commit()
+        v = agent_tasks.kanban_view(c, '2026-10-20T10:01:00+00:00')
+        self.assertTrue(v['legacy_counts'])
+        self.assertEqual((v['counts']['received'], v['counts']['rejected'], v['counts']['truncated'], v['counts']['stored']), (None, None, None, 200))
+        agent_tasks.store_kanban(c, T0, agent_tasks.parse_kanban([rec(1)]), 'ops', 'local')
+        self.assertFalse(agent_tasks.kanban_view(c, T0)['legacy_counts'])
+
+
+class Scheduling(unittest.TestCase):
+    NOW = __import__('datetime').datetime(2026, 10, 20, 10, 0, tzinfo=__import__('datetime').timezone.utc)
+
+    def test_a_ready_task_scheduled_for_later_is_scheduled_not_queued(self):
+        rows = agent_tasks.parse_kanban([
+            rec(1, 'ready', scheduled_at='2099-01-01T00:00:00Z'),
+            rec(2, 'ready', scheduled_at='2026-10-19T00:00:00+00:00'),
+            rec(3, 'todo', scheduled_at=4102444800),
+            rec(4, 'todo', scheduled_at=1700000000000),
+            rec(5, 'ready', scheduled_at='not a date'),
+            rec(6, 'ready', scheduled_at=None),
+            rec(7, 'running', scheduled_at='2099-01-01T00:00:00Z'),
+        ], now=self.NOW)['rows']
+        got = {r['external_id']: (r['status'], r['state_class']) for r in rows}
+        self.assertEqual(got['t1'], (None, 'scheduled'))
+        self.assertEqual(got['t2'], ('queued', 'open'), 'a time in the past is runnable now')
+        self.assertEqual(got['t3'], (None, 'scheduled'), 'epoch seconds')
+        self.assertEqual(got['t4'], ('queued', 'open'), 'epoch milliseconds in the past')
+        self.assertEqual(got['t5'], (None, 'scheduled'), 'an unreadable time is never treated as runnable')
+        self.assertEqual(got['t6'], ('queued', 'open'))
+        self.assertEqual(got['t7'], ('running', 'active'), 'only waiting states can be deferred')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -193,31 +193,60 @@ def declared(upto):
         mem.close()
 
 
+def _kinds(c):
+    """Every named schema object and its type. Tables, views, indexes and triggers share one namespace."""
+    return {r[0]: r[1] for r in c.execute("SELECT name,type FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")}
+
+
+def _declared_kinds(upto):
+    mem = sqlite3.connect(':memory:', isolation_level=None)
+    try:
+        for _, statements in MIGRATIONS[:upto]:
+            for statement in statements:
+                mem.execute(statement)
+        return _kinds(mem)
+    finally:
+        mem.close()
+
+
 def _conflicts(c, current):
-    live, live_objects = _shapes(c), _objects(c)
+    """Each conflict has a kind:
+    altered     a table this schema version already owns is missing or has a different shape (the owner's own data)
+    preexisting a table a pending migration would create already exists with a different shape (another implementation)
+    object      an index or trigger name a pending migration would create is already taken
+    namespace   a name a migration needs is held by a different kind of object (for example a view named like a table)"""
+    live, live_objects, live_kinds = _shapes(c), _objects(c), _kinds(c)
     names = lambda shape: [x[0] for x in shape['columns']] if shape else None
     conflicts = []
     now_tables, _ = declared(current)
+    now_kinds = _declared_kinds(current)
+    for name, kind in now_kinds.items():
+        if name in live_kinds and live_kinds[name] != kind:
+            conflicts.append({'kind': 'namespace', 'name': name, 'reason': f'schema v{current} has a {kind} named {name}, but this database has a {live_kinds[name]} with that name', 'live_columns': None, 'declared_columns': None})
     for name, shape in now_tables.items():
+        if name in live_kinds and live_kinds[name] != 'table':
+            continue
         if name not in live:
-            conflicts.append({'name': name, 'reason': f'table expected at schema v{current} is missing', 'live_columns': None, 'declared_columns': names(shape)})
+            conflicts.append({'kind': 'altered', 'name': name, 'reason': f'table expected at schema v{current} is missing', 'live_columns': None, 'declared_columns': names(shape)})
         elif _differs(live[name], shape):
-            conflicts.append({'name': name, 'reason': f'table does not match schema v{current}: {_differs(live[name], shape)}', 'live_columns': names(live[name]), 'declared_columns': names(shape)})
-    seen = set(now_tables)
+            conflicts.append({'kind': 'altered', 'name': name, 'reason': f'table does not match schema v{current}: {_differs(live[name], shape)}', 'live_columns': names(live[name]), 'declared_columns': names(shape)})
+    seen = set(now_kinds)
     for version in range(current + 1, LATEST + 1):
         tables, objects = declared(version)
-        before_tables, before_objects = declared(version - 1) if version > 1 else ({}, {})
-        for name in tables:
-            if name in before_tables or name in seen:
+        kinds = _declared_kinds(version)
+        before_kinds = _declared_kinds(version - 1) if version > 1 else {}
+        for name, kind in kinds.items():
+            if name in before_kinds or name in seen:
                 continue
             seen.add(name)
-            if name in live and _differs(live[name], tables[name]):
-                conflicts.append({'name': name, 'reason': f'a table named {name} already exists ({_differs(live[name], tables[name])}); migration {version} would skip or break on it', 'live_columns': names(live[name]), 'declared_columns': names(tables[name])})
-        for name, owner in objects.items():
-            if name in before_objects:
-                continue
-            if name in live_objects and not (owner in live and live_objects[name][1] == owner and not _differs(live[owner], tables[owner])):
-                conflicts.append({'name': name, 'reason': f'an index or trigger named {name} already exists (on {live_objects[name][1]})', 'live_columns': None, 'declared_columns': None})
+            if name in live_kinds and live_kinds[name] != kind:
+                conflicts.append({'kind': 'namespace', 'name': name, 'reason': f'migration {version} creates a {kind} named {name}, but this database already has a {live_kinds[name]} with that name', 'live_columns': None, 'declared_columns': None})
+            elif kind == 'table' and name in live and _differs(live[name], tables[name]):
+                conflicts.append({'kind': 'preexisting', 'name': name, 'reason': f'a table named {name} already exists ({_differs(live[name], tables[name])}); migration {version} would skip or break on it', 'live_columns': names(live[name]), 'declared_columns': names(tables[name])})
+            elif kind in ('index', 'trigger') and name in live_objects:
+                owner = objects[name]
+                if not (owner in live and live_objects[name][1] == owner and not _differs(live[owner], tables[owner])):
+                    conflicts.append({'kind': 'object', 'name': name, 'reason': f'an {kind} named {name} already exists (on {live_objects[name][1]})', 'live_columns': None, 'declared_columns': None})
     return conflicts
 
 
@@ -229,8 +258,44 @@ def invariants(c):
     if 'agent_tasks' in tables and 'agent_task_evidence' in tables:
         out['completed_without_approval_and_evidence'] = c.execute("""SELECT COUNT(*) FROM agent_tasks t WHERE t.status='completed' AND t.requires_review=1
             AND (t.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=t.id))""").fetchone()[0]
-    out['foreign_key_violations'] = len(c.execute('PRAGMA foreign_key_check').fetchall())
+    try:
+        out['foreign_key_violations'] = len(c.execute('PRAGMA foreign_key_check').fetchall())
+    except sqlite3.OperationalError as exc:  # e.g. 'foreign key mismatch' in a foreign table's REFERENCES
+        out['foreign_key_violations'] = 0
+        out['foreign_key_check_error'] = str(exc)[:200]
     return out
+
+
+def ro_uri(db):
+    """A read-only SQLite URI for any path: '#', '?' and '%' in a folder name must not change which file is opened."""
+    return Path(db).resolve().as_uri() + '?mode=ro'
+
+
+def needs_recovery(db):
+    """True when SQLite itself says a HOT journal must be rolled back (a writer died mid-transaction), which a read-only
+    connection cannot do. A journal that exists because a live writer is mid-transaction is not hot: reads just wait."""
+    db = Path(db)
+    if not db.exists():
+        return False
+    c = sqlite3.connect(ro_uri(db), uri=True, timeout=15)
+    try:
+        c.execute('SELECT COUNT(*) FROM sqlite_master').fetchone()
+        return False
+    except sqlite3.OperationalError as exc:
+        if 'readonly' in str(exc).lower() or 'read-only' in str(exc).lower():
+            return True
+        raise
+    finally:
+        c.close()
+
+
+def recover(db):
+    """Let SQLite roll back an interrupted transaction, exactly as any read-write open does. Returns integrity_check."""
+    c = sqlite3.connect(db, timeout=15)
+    try:
+        return c.execute('PRAGMA integrity_check').fetchone()[0]
+    finally:
+        c.close()
 
 
 def plan(db):
@@ -238,9 +303,13 @@ def plan(db):
     db = Path(db)
     if not db.exists():
         return {'exists': False, 'current': 0, 'latest': LATEST, 'pending': LATEST, 'has_data': False, 'conflicts': []}
-    c = sqlite3.connect(f'file:{db}?mode=ro', uri=True)
+    if needs_recovery(db):
+        return {'exists': True, 'needs_recovery': True, 'current': None, 'latest': LATEST, 'pending': None, 'has_data': True, 'conflicts': []}
+    c = sqlite3.connect(ro_uri(db), uri=True)
     try:
         current = c.execute('PRAGMA user_version').fetchone()[0]
+        if current < 0:
+            return {'exists': True, 'current': current, 'latest': LATEST, 'pending': None, 'has_data': True, 'conflicts': [], 'invalid_version': True}
         has_data = bool(_user_tables(c))
         conflicts = _conflicts(c, current) if current <= LATEST else []
         return {'exists': True, 'current': current, 'latest': LATEST, 'pending': max(LATEST - current, 0), 'has_data': has_data, 'conflicts': conflicts,
@@ -267,6 +336,10 @@ def migrate(db):
     Raises ConflictError (before writing anything) if the schema is not one this code can extend."""
     db = Path(db)
     state = plan(db)
+    if state.get('needs_recovery'):
+        raise RuntimeError(f'{db} has an interrupted transaction (a hot -journal file). Recover it first (the server does this on start); nothing was changed.')
+    if state.get('invalid_version'):
+        raise RuntimeError(f"Database user_version {state['current']} is not one this code writes. Refusing to touch it.")
     if state.get('newer_than_code'):
         raise RuntimeError(f"Database schema v{state['current']} is newer than this Keystal OS (v{LATEST}). Refusing to open it.")
     if state['conflicts']:

@@ -46,9 +46,13 @@ python3 local-os/tools/db_tool.py migrate-check --db <path>     # migrate a COPY
 python3 local-os/server.py --migrate                            # explicit activation
 ```
 
-If `inspect` reports a conflict, see [docs/RECONCILIATION.md](docs/RECONCILIATION.md) (`quarantine` renames the foreign tables, never deletes them). Task history, evidence and session records are append-only at the database level.
+**Rolling back.** Stop the server, then `python3 local-os/tools/db_tool.py restore --backup <file> --db <path>` (dry run) and again with `--execute`. It verifies the backup first, refuses while anything listens on the server port or holds the database, renames the current file to `workbench.replaced-<time>.sqlite3` (kept, never deleted), and says which code version opens the restored schema: v0 the original app, v2 PR #1 head `e0aea41`, v3 this branch. A v3 database cannot be opened by older code, so roll the code back together with the database.
 
-Other tools: `tools/probe_hermes_kanban.py` (real Hermes read, no titles printed), `tools/preview.py` (isolated loopback preview, synthetic data, prints the URL and commit), `tools/preserve_workspace.sh` (non-destructive snapshot of a dirty workspace). Release readiness and evidence classes: [docs/RELEASE.md](docs/RELEASE.md).
+If an interrupted transaction left a hot `-journal` (power loss, a kill), the read-only tools say so and stop; starting the server lets SQLite roll it back, exactly as any normal open does.
+
+If `inspect` reports a conflict, see [docs/RECONCILIATION.md](docs/RECONCILIATION.md). `quarantine` renames another implementation's tables, never deletes them, and refuses when the conflict is your own altered table, when a view holds a table name, or when foreign keys elsewhere point at a table it would rename. Task history, evidence and session records are append-only at the database level.
+
+Other tools: `tools/probe_hermes_kanban.py` (real Hermes read, no titles printed; with a pinned board it also checks the name appears in `hermes kanban boards list`), `tools/preview.py` (isolated loopback preview: synthetic data, synthetic documents and a throwaway HOME, so the Dropbox check cannot reach your vault; prints the URL and commit), `tools/preserve_workspace.sh` (non-destructive snapshot of a dirty workspace). Release readiness and evidence classes: [docs/RELEASE.md](docs/RELEASE.md).
 
 Environment: `KEYSTAL_OS_DATA`, `KEYSTAL_OS_PORT`, `KEYSTAL_OS_HERMES` (CLI path/name, default `hermes`), `KEYSTAL_OS_KANBAN_BOARD`, `KEYSTAL_OS_HERMES_INSTANCE` (a label you choose for this Hermes installation, stored with each snapshot and link; it is never passed to Hermes, and Hermes boards are not partitioned by it; default `local`), `KEYSTAL_OS_DOCROOT` (saved OS documents folder, default `~/Keystal/outputs/keystal-os`; tests and the preview point it at synthetic documents), `KEYSTAL_OS_KANBAN_REFRESH_SECONDS` (default 300, `0` = startup read only), `KEYSTAL_OS_KANBAN_STALE_SECONDS` (default `max(600, 2×refresh)`), `KEYSTAL_OS_STALE_HOURS` (running task with no update, default 24), `KEYSTAL_OS_PREVIEW_LABEL` (shows a banner; set by the preview tool).
 

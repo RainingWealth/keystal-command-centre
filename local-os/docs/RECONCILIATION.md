@@ -7,7 +7,7 @@
 **Canonical workspace:** `/Users/RayVern/Keystal/keystal-command-centre` (clean on `main`), on the PR #1 branch.
 **Canonical implementation:** the PR foundation (`agent_tasks.py`, `migrations.py`).
 
-Reasons that do not depend on seeing the other code: it has the migration framework and conflict detection, a database-level approval gate, 172 automated tests (the alternative has 6, and its direct creation with status `completed` bypasses approval), and Keystal reported that the PR #1 Kanban adapter parsed a real `hermes kanban list --json` response on the Mac (31 records). That run used the earlier adapter; it has to be repeated on this commit with `tools/probe_hermes_kanban.py`.
+Reasons that do not depend on seeing the other code: it has the migration framework and conflict detection, a database-level approval gate, an automated suite (see `RELEASE.md`; the alternative has 6 tests, and its direct creation with status `completed` bypasses approval), and Keystal reported that the PR #1 Kanban adapter parsed a real `hermes kanban list --json` response on the Mac (31 records). That run used the earlier adapter; it has to be repeated on this commit with `tools/probe_hermes_kanban.py`.
 
 ## Step 1: preserve the other workspace (read-only on the source)
 
@@ -26,7 +26,7 @@ Writes a new timestamped folder under `~/Keystal/backups/` containing: the git s
 | `task_store.py` (task store) | `agent_tasks.py` task functions, `agent_tasks`/history/evidence tables | Retire after porting any behaviour the PR lacks, with a test per ported behaviour. *needs the code* |
 | `hermes_kanban.py` (adapter) | `agent_tasks.fetch_kanban` / `parse_kanban` | Retire if equivalent; diff the field mapping and status handling. *needs the code* |
 | `agents` table (incompatible columns) | `agents` table (`role`, `integration`, ...) | Not migrated automatically. Quarantined, never merged blindly (step 4). |
-| Its 6 tests | The 172-test suite | Port any that assert behaviour not already covered. *needs the code* |
+| Its 6 tests | This branch's suite (`RELEASE.md`) | Port any that assert behaviour not already covered. *needs the code* |
 | Direct creation as `completed` (review `pending`, no evidence) | Rejected by the API and by the database | This is a defect to retire, not a feature to keep. |
 
 ## Step 3: production database, read-only first

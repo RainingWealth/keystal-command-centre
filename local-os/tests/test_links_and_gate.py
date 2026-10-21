@@ -332,9 +332,17 @@ class AuthorityWording(unittest.TestCase):
         offenders = []
         for path in [root / 'app.js', root / 'index.html', root / 'server.py', root / 'README.md', *sorted((root / 'docs').glob('*.md'))]:
             text = path.read_text()
-            for m in re.finditer(r'[^.\n]*ClickUp[^.\n]*(execution authority|task authority)[^.\n]*', text, re.I):
+            # Within ClickUp's own clause (up to . ; or newline): 'execution authority/record', 'task authority'.
+            for m in re.finditer(r'[^.;\n]*ClickUp[^.;\n]*(execution (authority|record)|task authority|authority for tasks)[^.;\n]*', text, re.I):
                 offenders.append(f'{path.name}: {m.group(0).strip()[:120]}')
         self.assertEqual(offenders, [])
+
+    def test_the_wording_check_catches_every_phrasing_that_shipped_before(self):
+        import re
+        pattern = r'[^.;\n]*ClickUp[^.;\n]*(execution (authority|record)|task authority|authority for tasks)[^.;\n]*'
+        for old in ("row('ClickUp', 'Execution authority. This OS has no ClickUp adapter", 'ClickUp remains the execution record.', 'ClickUp is task authority;'):
+            self.assertTrue(re.search(pattern, old, re.I), old)
+        self.assertFalse(re.search(pattern, 'ClickUp owns business commitments; Hermes Kanban owns internal agent execution', re.I))
 
 
 if __name__ == '__main__':

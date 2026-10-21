@@ -54,6 +54,20 @@ def _stale_hours():
         return 24.0
 
 
+def _ts(value):
+    """An aware datetime from a stored ISO string, or None if it is missing, unparsable or naive. Never raises."""
+    try:
+        parsed = dt.datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed.tzinfo else None
+
+
+def _clean(value, limit):
+    """Text from Hermes made safe to store: lone surrogates (half an emoji) cannot be encoded and would abort the write."""
+    return str(value).encode('utf-8', 'replace').decode('utf-8').strip()[:limit]
+
+
 def kanban_timing():
     """(refresh_seconds, stale_after_seconds). refresh 0 disables the background read."""
     def number(name, default):
@@ -380,6 +394,9 @@ def link_task(c, now, data):
             raise ApiError('That card is not in the last successful Hermes read. Refresh the board and try again.', 404)
         if task['agent_id'] not in (None, 'hermes'):
             raise ApiError('Hermes Kanban cards can only be linked to tasks assigned to Hermes.', 409)
+        other = c.execute("SELECT instance FROM external_refs WHERE provider='hermes_kanban' AND scope=? AND external_id=?", (meta['snapshot_board'], external_id)).fetchone()
+        if other:
+            raise ApiError(f"That card is already linked (under the instance label '{other['instance']}'). One card maps to one task.", 409)
         instance, scope, context, url = meta['snapshot_instance'], meta['snapshot_board'], '', ''
     else:
         # A ClickUp task id is unique within its workspace and a task can sit in several lists, so the list is
@@ -461,10 +478,10 @@ def sweep_stale(c, now_iso):
     now = dt.datetime.fromisoformat(now_iso)
     hours = _stale_hours()
     for row in running:
-        try:
-            idle = now - dt.datetime.fromisoformat(row['updated'])
-        except ValueError:
+        updated = _ts(row['updated'])
+        if updated is None:
             continue
+        idle = now - updated
         if idle >= dt.timedelta(hours=hours):
             cur = c.execute("UPDATE agent_tasks SET status='stale',status_source='observed',status_changed=? WHERE id=? AND status='running' AND updated=?", (now_iso, row['id'], row['updated']))
             if cur.rowcount == 1:
@@ -503,8 +520,10 @@ def task_detail(c, tid):
         ref = dict(r)
         if r['provider'] == 'hermes_kanban':
             same_board = meta['snapshot_pinned'] and meta['snapshot_board'] == r['scope'] and meta['snapshot_instance'] == r['instance']
+            reason = (None if same_board else 'no_read' if not meta['last_success_at'] else 'unpinned' if not meta['snapshot_pinned']
+                      else 'other_board' if meta['snapshot_board'] != r['scope'] else 'other_instance')
             card = c.execute('SELECT external_id,title,status_raw,status,state_class,assignee,updated_raw FROM kanban_snapshot WHERE external_id=?', (r['external_id'],)).fetchone() if same_board else None
-            ref['board_record'] = {'comparable': bool(same_board), 'in_last_read': bool(card), 'last_success_at': meta['last_success_at'], 'snapshot_board': meta['snapshot_board'],
+            ref['board_record'] = {'comparable': bool(same_board), 'reason': reason, 'in_last_read': bool(card), 'last_success_at': meta['last_success_at'], 'snapshot_board': meta['snapshot_board'],
                                    'snapshot_truncated': bool(meta['truncated']), 'snapshot_dropped': meta['dropped'],
                                    'record': dict(card) if card else None,
                                    'drift': bool(card and card['status'] and card['status'] != row['status'])}
@@ -552,10 +571,12 @@ def _kanban_meta(c):
             meta['snapshot_instance'] = raw['instance'] if raw.get('last_success_at') else None
         meta.pop('instance', None)
         return meta
+    # Written by PR #1, which did not count rejected, archived or duplicate records and silently cut at 200.
     ok = raw.get('status') == 'connected'
     count = raw.get('count', 0) if ok else 0
-    return {**_KANBAN_DEFAULTS, 'last_attempt_at': raw.get('checked_at'), 'last_attempt_status': raw.get('status', 'unchecked'), 'last_attempt_detail': raw.get('detail', ''),
-            'last_success_at': raw.get('checked_at') if ok else None, 'received': count, 'unique': count, 'stored': count}
+    unknown = dict.fromkeys(('received', 'rejected', 'archived_skipped', 'duplicates', 'unique', 'dropped', 'truncated'))
+    return {**_KANBAN_DEFAULTS, **unknown, 'legacy_counts': True, 'last_attempt_at': raw.get('checked_at'), 'last_attempt_status': raw.get('status', 'unchecked'),
+            'last_attempt_detail': raw.get('detail', ''), 'last_success_at': raw.get('checked_at') if ok else None, 'stored': count}
 
 
 def kanban_view(c, now_iso):
@@ -565,18 +586,28 @@ def kanban_view(c, now_iso):
     refresh, stale_after = kanban_timing()
     links, anywhere = {}, set()
     if meta['snapshot_pinned'] and meta['snapshot_instance']:
-        for r in c.execute("SELECT external_id,task_id FROM external_refs WHERE provider='hermes_kanban' AND instance=? AND scope=?", (meta['snapshot_instance'], meta['snapshot_board'])):
-            links[r['external_id']] = r['task_id']
+        for r in c.execute("SELECT external_id,task_id,instance FROM external_refs WHERE provider='hermes_kanban' AND scope=?", (meta['snapshot_board'],)):
+            if r['instance'] == meta['snapshot_instance']:
+                links[r['external_id']] = r['task_id']
+            else:
+                # Same board, linked under another instance label. The label does not partition Hermes boards, so this
+                # is very likely the same card: never count it again.
+                anywhere.add(r['external_id'])
     else:
         # The board is not pinned, so this snapshot's board is unknown: a card whose id is linked on SOME board may be
         # that linked card. It is marked ambiguous and not counted, rather than risk counting the same work twice.
         anywhere = {r['external_id'] for r in c.execute("SELECT external_id FROM external_refs WHERE provider='hermes_kanban'")}
-    tasks = [{**dict(r), 'linked_task_id': links.get(r['external_id']), 'possibly_linked': r['external_id'] in anywhere}
+    tasks = [{**dict(r), 'linked_task_id': links.get(r['external_id']), 'possibly_linked': r['external_id'] in anywhere and r['external_id'] not in links}
              for r in c.execute('SELECT external_id,title,status_raw,status,state_class,assignee,updated_raw,fetched FROM kanban_snapshot ORDER BY rowid')]
     age = stale = None
+    time_unreadable = False
     if meta['last_success_at']:
-        age = max(0, int((dt.datetime.fromisoformat(now_iso) - dt.datetime.fromisoformat(meta['last_success_at'])).total_seconds()))
-        stale = age > stale_after
+        success = _ts(meta['last_success_at'])
+        if success is None:
+            stale, time_unreadable = True, True  # never present data of unknown age as fresh, never crash the dashboard
+        else:
+            age = max(0, int((dt.datetime.fromisoformat(now_iso) - success).total_seconds()))
+            stale = age > stale_after
     status = meta['last_attempt_status']
     pinned = bool(meta['snapshot_pinned'])
     if meta['last_success_at'] is None:
@@ -589,7 +620,8 @@ def kanban_view(c, now_iso):
     counts['listed_total'] = len(tasks)
     return {
         'status': status, 'detail': meta['last_attempt_detail'], 'error': meta['last_attempt_detail'] if status in ('failed', 'not_connected') else None,
-        'last_attempt_at': meta['last_attempt_at'], 'last_success_at': meta['last_success_at'], 'age_seconds': age, 'stale': stale,
+        'last_attempt_at': meta['last_attempt_at'], 'last_success_at': meta['last_success_at'], 'age_seconds': age, 'stale': stale, 'time_unreadable': time_unreadable,
+        'legacy_counts': bool(meta.get('legacy_counts')),
         'stale_after_seconds': stale_after, 'refresh_seconds': refresh,
         'showing_last_success': bool(meta['last_success_at']) and status != 'connected',
         'board': board, 'counts': counts, 'state_counts': meta['state_counts'], 'status_counts': meta['status_counts'], 'class_counts': meta['class_counts'],
@@ -623,7 +655,8 @@ def overview(c, runtime, kanban):
         tally = {s: counts.get(a['id'], {}).get(s, 0) for s in STATUSES}
         last = c.execute("SELECT h.at,h.kind,h.source FROM agent_task_history h JOIN agent_tasks t ON t.id=h.task_id WHERE t.agent_id=? AND h.source!='observed' ORDER BY h.id DESC LIMIT 1", (a['id'],)).fetchone()
         running = [dict(r) for r in c.execute("SELECT id,title,status_source,updated FROM agent_tasks WHERE agent_id=? AND status='running' ORDER BY updated DESC LIMIT 3", (a['id'],))]
-        card = {'id': a['id'], 'name': a['name'], 'role': a['role'], 'last_update': dict(last) if last else None, 'running': running, 'observation': None, 'board': None}
+        card = {'id': a['id'], 'name': a['name'], 'role': a['role'], 'last_update': dict(last) if last else None, 'running': running, 'observation': None, 'board': None,
+                'tracked_open': sum(v for k, v in tally.items() if k != 'completed')}
         if a['integration'] == 'local_cli':
             found = bool(runtime.get('bridge_available'))
             tracked = sum(tally.values())
@@ -647,7 +680,23 @@ def overview(c, runtime, kanban):
     return {'agents': cards, 'totals': total, 'board_totals': board_extra, 'unassigned_open': unassigned, 'stale_hours': _stale_hours()}
 
 
-def parse_kanban(data):
+def _deferred(value, now):
+    """Hermes expresses scheduling as a scheduled_at time on a task. True if it is in the future or cannot be read
+    (an unreadable time is not treated as 'runnable now')."""
+    if value in (None, '', 0):
+        return False
+    when = None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            when = dt.datetime.fromtimestamp(value / 1000 if value > 1e11 else value, dt.timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return True
+    elif isinstance(value, str):
+        when = _ts(value.replace('Z', '+00:00'))
+    return True if when is None else when > now
+
+
+def parse_kanban(data, now=None):
     """Normalise a decoded `hermes kanban list --json` payload. Fails closed: a non-empty list in which
     nothing is recognisable is a read failure, never a connected board with zero tasks."""
     if isinstance(data, dict):
@@ -661,27 +710,29 @@ def parse_kanban(data):
         if not isinstance(item, dict):
             rejected += 1
             continue
-        names.update(str(k)[:40] for k in list(item)[:60])
+        names.update(_clean(k, 40) for k in list(item)[:60])
         ident = item.get('id', item.get('task_id'))
         title = item.get('title')
         if ident in (None, '') or isinstance(ident, (dict, list)) or not isinstance(title, str) or not title.strip():
             rejected += 1
             continue
-        raw = str(item.get('status') if item.get('status') not in (None, '') else 'unknown').strip()[:40] or 'unknown'
+        raw = _clean(item.get('status') if item.get('status') not in (None, '') else 'unknown', 40) or 'unknown'
         mapped, state_class = KANBAN_STATES.get(raw.lower(), (None, 'unknown'))
+        if state_class == 'open' and _deferred(item.get('scheduled_at'), now or dt.datetime.now(dt.timezone.utc)):
+            mapped, state_class = None, 'scheduled'
         if state_class == 'archived':
             archived += 1
             continue
-        eid = str(ident)[:80]
+        eid = _clean(ident, 80)
         if eid in seen:
             duplicates += 1
             continue
         seen.add(eid)
         assignee = item.get('assignee')
         updated = item.get('updated_at', item.get('updated', item.get('created_at')))
-        rows.append({'external_id': eid, 'title': title.strip()[:300], 'status_raw': raw, 'status': mapped, 'state_class': state_class,
-                     'assignee': str(assignee)[:80] if assignee and not isinstance(assignee, (dict, list)) else None,
-                     'updated_raw': str(updated)[:40] if updated is not None and not isinstance(updated, (dict, list)) else None})
+        rows.append({'external_id': eid, 'title': _clean(title, 300), 'status_raw': raw, 'status': mapped, 'state_class': state_class,
+                     'assignee': _clean(assignee, 80) if assignee and not isinstance(assignee, (dict, list)) else None,
+                     'updated_raw': _clean(updated, 40) if updated is not None and not isinstance(updated, (dict, list)) else None})
     counts = {'received': received, 'rejected': rejected, 'archived_skipped': archived, 'duplicates': duplicates, 'unique': len(rows)}
     if received and rejected == received:
         return {'status': 'failed', 'detail': f'Hermes returned {received} record{"" if received == 1 else "s"} but none were recognisable as tasks (each needs an id and a title). Nothing was imported and the last good read is kept.', **counts, 'field_names': sorted(names)}
@@ -721,7 +772,7 @@ def fetch_kanban(hermes, board=None, timeout=20):
         return {'status': 'failed', 'detail': 'Hermes returned more Kanban data than this app will read. The last good read is kept.'}
     try:
         data = json.loads(r.stdout)
-    except ValueError:
+    except (ValueError, RecursionError):
         return {'status': 'failed', 'detail': 'Hermes Kanban output was not JSON this app recognises. Nothing was imported and the last good read is kept.'}
     return parse_kanban(data)
 
@@ -743,7 +794,7 @@ def store_kanban(c, now, result, board, instance, manual=False):
             class_counts[r['state_class']] = class_counts.get(r['state_class'], 0) + 1
             if r['status']:
                 status_counts[r['status']] = status_counts.get(r['status'], 0) + 1
-        meta.update(last_success_at=now, snapshot_board=board, snapshot_pinned=bool(board), snapshot_instance=instance, state_counts=state_counts, status_counts=status_counts, class_counts=class_counts,
+        meta.update(last_success_at=now, snapshot_board=board, snapshot_pinned=bool(board), snapshot_instance=instance, legacy_counts=False, state_counts=state_counts, status_counts=status_counts, class_counts=class_counts,
                     **{k: result[k] for k in ('received', 'rejected', 'archived_skipped', 'duplicates', 'unique', 'stored', 'dropped', 'truncated')})
     c.execute('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)', ('kanban', json.dumps(meta)))
     if manual or previous != result['status']:

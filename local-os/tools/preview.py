@@ -73,8 +73,13 @@ def main(argv=None):
     elif args.hermes == 'none':
         env['KEYSTAL_OS_HERMES'] = str(scratch / 'no-such-hermes')
         label += ' · no Hermes'
+    if args.hermes == 'real':
+        # The real Hermes CLI needs your real HOME (~/.hermes). Say plainly what is real.
+        label += ' · REAL Hermes CLI and REAL Dropbox check'
     else:
-        label += ' · REAL Hermes CLI'
+        # A throwaway HOME: nothing under ~/.hermes or ~/Keystal can be reached, including the Dropbox read check.
+        (scratch / 'home').mkdir()
+        env['HOME'] = str(scratch / 'home')
     env['KEYSTAL_OS_PREVIEW_LABEL'] = label
     process = subprocess.Popen([sys.executable, str(LOCAL_OS / 'server.py')], env=env)
     base = f'http://127.0.0.1:{args.port}'

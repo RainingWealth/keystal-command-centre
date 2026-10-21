@@ -276,5 +276,52 @@ class StaleOnEveryPage(UiCase):
         self.assertIn('STALE', self.page.locator('#kanban-panel').inner_text())
 
 
+class ReviewFindingsUi(UiCase):
+    server_kwargs = {'extra_env': {'KEYSTAL_OS_KANBAN_BOARD': 'ops'}}
+
+    def test_view_tasks_counts_tracked_tasks_and_a_failed_read_is_not_called_not_connected(self):
+        self.create('UI: one tracked hermes task', agent='hermes')
+        self.go('today')
+        state = self.server.client(wait_for_first_read=False).state()
+        tracked = sum(1 for t in state['agent_tasks'] if t['agent_id'] == 'hermes' and t['status'] != 'completed')
+        hermes = state['agents']['agents'][0]
+        self.assertGreater(hermes['open'], tracked, 'the tiles include board records')
+        card = self.page.locator('#agent-overview .agent-card:has(h3:text-is("Hermes"))')
+        self.assertIn(f'View tasks ({tracked})', card.inner_text(), 'the button counts tasks it can list, not board records')
+
+    def test_unpinned_link_reason_is_stated_honestly(self):
+        p = self.page
+        self.create('UI: reason task', agent='hermes')
+        self.open_task('UI: reason task')
+        form = p.locator('[data-task-form="link-hermes"]')
+        form.locator('select[name="external_id"]').select_option('t_004')
+        form.locator('button[type="submit"]').click()
+        p.locator('#task-dialog .evidence-row', has_text='Hermes Kanban card').wait_for()
+        p.locator('[data-close="task-dialog"]').click()
+        del self.server.extra_env['KEYSTAL_OS_KANBAN_BOARD']
+        self.server.restart()
+        self.server.client()
+        p.reload()
+        p.locator('#server-status', has_text='connected').wait_for()
+        self.open_task('UI: reason task')
+        text = p.locator('#task-dialog').inner_text()
+        self.assertIn('The last read was not from a pinned board', text)
+        self.assertNotIn('from another board', text)
+        p.locator('[data-close="task-dialog"]').click()
+        self.server.extra_env['KEYSTAL_OS_KANBAN_BOARD'] = 'ops'
+        self.server.restart()
+
+
+class FailedFirstRead(UiCase):
+    server_kwargs = {'extra_env': {'KEYSTAL_OS_KANBAN_BOARD': 'ops'}, 'kanban_mode': 'error'}
+
+    def test_hermes_card_says_read_failed_not_not_connected(self):
+        self.page.reload()
+        self.page.locator('#server-status', has_text='connected').wait_for()
+        card = self.page.locator('#agent-overview .agent-card:has(h3:text-is("Hermes"))').inner_text()
+        self.assertIn('READ FAILED, no successful read yet', card)
+        self.assertNotIn('NOT CONNECTED', card)
+
+
 if __name__ == '__main__':
     unittest.main()

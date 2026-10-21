@@ -561,5 +561,49 @@ class ExistingFeaturesPreserved(ApiCase):
             s.stop(); s.tmp.cleanup()
 
 
+class StartupSafety(unittest.TestCase):
+    def test_the_migrate_gate_holds_for_a_data_folder_with_special_characters(self):
+        import tempfile
+        from test_migrations import pr_v2_db
+        root = Path(tempfile.mkdtemp())
+        d = root / 'Keystal #2' / 'local-state'
+        d.mkdir(parents=True)
+        pr_v2_db(d / 'workbench.sqlite3')
+        code, message = Server(data=d).run_to_exit()
+        self.assertEqual(code, 2, message)
+        self.assertEqual(sqlite3.connect(d / 'workbench.sqlite3').execute('PRAGMA user_version').fetchone()[0], 2)
+        self.assertEqual(sorted(p.name for p in root.iterdir()), ['Keystal #2'], 'no stray file next to the folder')
+
+    def test_an_interrupted_transaction_is_recovered_at_startup(self):
+        import subprocess, tempfile
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        import migrations
+        d = Path(tempfile.mkdtemp())
+        migrations.migrate(d / 'workbench.sqlite3')
+        code = f"""import sqlite3,os
+c=sqlite3.connect({str(d / 'workbench.sqlite3')!r},isolation_level=None); c.execute('PRAGMA cache_size=1'); c.execute('BEGIN IMMEDIATE')
+for i in range(3000): c.execute("INSERT INTO events(kind,label,created) VALUES('x',?,'n')",('y'*200,))
+os._exit(9)"""
+        subprocess.run([sys.executable, '-c', code])
+        self.assertTrue(migrations.needs_recovery(d / 'workbench.sqlite3'))
+        s = Server(data=d)
+        s.start()
+        try:
+            self.assertEqual(s.client().state()['runtime']['mode'], 'local')
+            self.assertFalse(migrations.needs_recovery(d / 'workbench.sqlite3'))
+        finally:
+            s.stop(); s.tmp.cleanup()
+
+    def test_a_negative_user_version_stops_the_server(self):
+        import tempfile
+        from test_migrations import legacy_db
+        d = Path(tempfile.mkdtemp())
+        legacy_db(d / 'workbench.sqlite3')
+        db = sqlite3.connect(d / 'workbench.sqlite3'); db.execute('PRAGMA user_version=-1'); db.commit(); db.close()
+        code, message = Server(data=d, args=['--migrate']).run_to_exit()
+        self.assertEqual(code, 2)
+        self.assertIn('never writes', message)
+
+
 if __name__ == '__main__':
     unittest.main()

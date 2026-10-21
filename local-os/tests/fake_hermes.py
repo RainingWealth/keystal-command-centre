@@ -36,6 +36,9 @@ if args[:1] == ['kanban']:
         sys.exit(0)
     if mode == 'hang':
         time.sleep(120)
+    if args[1:3] == ['boards', 'list']:
+        print('\n'.join(os.environ.get('FAKE_HERMES_BOARDS', 'default ops synthetic').split()))
+        sys.exit(0)
     if 'list' in args and '--json' in args:
         path = os.environ.get('FAKE_HERMES_KANBAN_JSON')
         print(Path(path).read_text() if path else '[]')
