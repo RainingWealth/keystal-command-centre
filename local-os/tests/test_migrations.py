@@ -29,6 +29,7 @@ def legacy_db(path):
 FROZEN_HASHES = {  # SHA-256 of each shipped migration's statements as they are in PR #1 head e0aea41 (not merged yet). Never edit a shipped migration.
     1: '43ac9a096b98a50e064d599bf3c2702b8f1f2c70ca5e92fdc9f93018d18d81ce',
     2: '033e4ba47f06179cdd65aacb1b6f2bdcefdb00157f33f2a852853ba3d963db3f',
+    3: 'ebdd765f61fd42149df5323b8224e5da1cb598d7b3ede984d13151a4a3814b6f',  # as pushed in b9bd4c3
 }
 
 
@@ -67,6 +68,40 @@ def foreign_db(path, colliding_names=False):
         c.execute("CREATE TABLE agent_tasks(id TEXT PRIMARY KEY,title TEXT,state TEXT)")
         c.execute("CREATE INDEX agent_tasks_agent_status ON agent_tasks(state)")
         c.execute("INSERT INTO agent_tasks VALUES('f2','Foreign agent task','done')")
+    c.commit()
+    c.close()
+
+
+# The other local implementation's schema, verbatim from keystal-command-centre-1/task_store.py migrate()
+# (provided 21 October 2026). DDL and the five agent names only; rows below are synthetic.
+ALT_TASK_STORE_SQL = [
+    'CREATE TABLE IF NOT EXISTS task_migrations(version INTEGER PRIMARY KEY, applied TEXT NOT NULL)',
+    'CREATE TABLE agents(id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, created TEXT NOT NULL)',
+    """CREATE TABLE tasks(
+                id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL,
+                agent_id TEXT REFERENCES agents(id), status TEXT NOT NULL CHECK(status IN
+                ('queued','running','awaiting review','blocked','failed','paused','completed','stale')),
+                source TEXT NOT NULL CHECK(source IN ('manual','agent-reported')),
+                evidence TEXT NOT NULL, note TEXT NOT NULL, review TEXT NOT NULL DEFAULT 'pending',
+                created TEXT NOT NULL, updated TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1)""",
+    """CREATE TABLE task_history(
+                id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL REFERENCES tasks(id),
+                action TEXT NOT NULL, source TEXT NOT NULL, snapshot TEXT NOT NULL, created TEXT NOT NULL)""",
+    'CREATE INDEX task_history_task ON task_history(task_id,id)',
+]
+
+
+def alt_db(path):
+    """A workbench database the other implementation has written to: the original tables plus its own."""
+    c = sqlite3.connect(path)
+    c.executescript(ORIGINAL_INIT_SQL)
+    for statement in ALT_TASK_STORE_SQL:
+        c.execute(statement)
+    c.executemany('INSERT INTO agents VALUES(?,?,?)', [(n.lower(), n, 'n') for n in ('Hermes', 'ChatGPT', 'Claude', 'Codex', 'Gemini')])
+    c.execute("INSERT INTO task_migrations VALUES(1,'n')")
+    c.execute("INSERT INTO tasks(id,title,description,agent_id,status,source,evidence,note,created,updated) VALUES('a'||hex(randomblob(15)),'Synthetic alt task','','claude','completed','manual','[]','','n','n')")
+    c.execute("INSERT INTO task_history(task_id,action,source,snapshot,created) SELECT id,'create','manual','{}','n' FROM tasks")
+    c.execute("INSERT INTO captures VALUES('c1','Synthetic capture','Build','QA','','inbox',0,'n')")
     c.commit()
     c.close()
 
@@ -591,6 +626,19 @@ os._exit(9)"""
         self.assertEqual([(x['name'], x['kind']) for x in migrations.plan(db)['conflicts']], [('agent_tasks', 'altered')])
         foreign_db(self.root / 'f.sqlite3')
         self.assertEqual([(x['name'], x['kind']) for x in migrations.plan(self.root / 'f.sqlite3')['conflicts']], [('agents', 'preexisting')])
+
+
+class AlternativeImplementationSchema(unittest.TestCase):
+    """The real schema of the other local implementation, not a stand-in."""
+    def test_it_is_detected_and_refused_before_anything_is_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = Path(tmp) / 'workbench.sqlite3'
+            alt_db(db)
+            before = file_hash(db)
+            self.assertEqual([(x['name'], x['kind']) for x in migrations.plan(db)['conflicts']], [('agents', 'preexisting')])
+            with self.assertRaises(migrations.ConflictError):
+                migrations.migrate(db)
+            self.assertEqual(file_hash(db), before)
 
 
 if __name__ == '__main__':

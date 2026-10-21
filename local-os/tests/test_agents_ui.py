@@ -248,6 +248,32 @@ class TaskLifecycle(UiCase):
         p.locator('#task-status-filter').select_option('')
 
 
+class TwoTabs(UiCase):
+    def test_a_second_tab_cannot_silently_overwrite_a_newer_version(self):
+        p = self.page
+        self.create('UI: two tabs', agent='claude')
+        self.open_task('UI: two tabs')
+        other = self.browser.new_page(viewport={'width': 1440, 'height': 1000})
+        try:
+            other.goto(self.server.base)
+            other.locator('#server-status', has_text='connected').wait_for()
+            other.locator('[data-view="agents"]').click()
+            other.locator('.task-card', has=other.locator('h3', has_text=re.compile('^UI: two tabs$'))).locator('[data-task-open]').click()
+            other.wait_for_selector('#task-dialog[open]')
+            other.locator('[data-task-form="edit"] select[name="priority"]').select_option('urgent')
+            other.locator('[data-task-form="edit"] button[type="submit"]').click()
+            other.locator('#toast', has_text='Details saved').wait_for()
+        finally:
+            other.close()
+        form = p.locator('[data-task-form="edit"]')
+        form.locator('select[name="priority"]').select_option('low')
+        form.locator('button[type="submit"]').click()
+        p.locator('#toast', has_text='changed since you opened it').wait_for()
+        state = self.server.client(wait_for_first_read=False).state()
+        self.assertEqual(next(t for t in state['agent_tasks'] if t['title'] == 'UI: two tabs')['priority'], 'urgent', 'the newer save from the other tab was kept')
+        p.locator('[data-close="task-dialog"]').click()
+
+
 class KanbanPanel(UiCase):
     def refresh_panel(self):
         self.go('agents')

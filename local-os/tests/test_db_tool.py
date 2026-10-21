@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))
 import db_tool  # noqa: E402
 import migrations  # noqa: E402
-from test_migrations import foreign_db, legacy_db, pr_v2_db, file_hash, dump  # noqa: E402
+from test_migrations import alt_db, foreign_db, legacy_db, pr_v2_db, file_hash, dump  # noqa: E402
 
 
 def run(*argv):
@@ -202,7 +202,7 @@ class Quarantine(ToolCase):
         code, report = run('quarantine', '--db', str(self.db))
         self.assertEqual((code, report['executed']), (0, False))
         self.assertEqual(sorted(report['would_rename']), ['agent_tasks', 'agents'])
-        self.assertIn('agent_tasks_agent_status', report['would_drop_indexes_and_triggers_of_those_tables'])
+        self.assertIn('agent_tasks_agent_status', report['would_drop_colliding_indexes_and_triggers'])
         self.assertEqual((file_hash(self.db), self.listing()), (before, files))
 
     def test_execute_backs_up_first_preserves_every_foreign_row_then_migrates(self):
@@ -228,16 +228,18 @@ class Quarantine(ToolCase):
         c.close()
         self.assertEqual(len(stamp), 2)
 
-    def test_refuses_when_a_view_or_trigger_elsewhere_depends_on_a_conflicting_table(self):
+    def test_a_view_elsewhere_follows_the_quarantined_table(self):
         foreign_db(self.db)
         c = sqlite3.connect(self.db)
         c.execute('CREATE VIEW foreign_report AS SELECT name FROM agents')
         c.commit(); c.close()
-        before = file_hash(self.db)
-        code, report = run('quarantine', '--db', str(self.db), '--execute')
-        self.assertEqual(code, 3)
-        self.assertIn('foreign_report', json.dumps(report['refused']))
-        self.assertEqual(file_hash(self.db), before)
+        code, report = run('quarantine', '--db', str(self.db), '--out', str(self.dir / 'bk'), '--execute')
+        self.assertEqual((code, report['executed']), (0, True))
+        self.assertIn('foreign_report', report['references_that_will_follow_the_rename'])
+        migrations.migrate(self.db)
+        c = sqlite3.connect(self.db)
+        self.assertEqual(c.execute('SELECT name FROM foreign_report').fetchall(), [('Hermes',)], 'the view still shows the foreign rows, not the new agents table')
+        c.close()
 
     def test_nothing_to_do_without_a_conflict(self):
         legacy_db(self.db)
@@ -260,7 +262,7 @@ os._exit(9)"""
             self.assertIn('NEEDS RECOVERY', report['result'])
         self.assertTrue(Path(str(self.db) + '-journal').exists(), 'the tool did not touch the journal')
 
-    def test_quarantine_refuses_when_foreign_keys_elsewhere_point_at_the_table(self):
+    def test_foreign_keys_elsewhere_follow_the_quarantined_table_and_never_re_parent(self):
         c = sqlite3.connect(self.db)
         for statement in migrations.MIGRATIONS[0][1]:
             c.execute(statement)
@@ -268,11 +270,17 @@ os._exit(9)"""
             CREATE TABLE tasks(id TEXT PRIMARY KEY,title TEXT NOT NULL,status TEXT NOT NULL,agent_id TEXT REFERENCES agents(id),review TEXT);
             INSERT INTO agents VALUES('claude','Claude (foreign row)','api','ok'); INSERT INTO tasks VALUES('f1','Foreign task','completed','claude','pending');""")
         c.close()
-        before = file_hash(self.db)
         code, report = run('quarantine', '--db', str(self.db), '--out', str(self.dir / 'bk'), '--execute')
-        self.assertEqual((code, report['executed']), (3, False))
-        self.assertIn('tasks.agent_id -> agents', json.dumps(report['refused']))
-        self.assertEqual(file_hash(self.db), before)
+        self.assertEqual((code, report['executed']), (0, True))
+        self.assertEqual(report['references_that_will_follow_the_rename'], ['tasks.agent_id -> agents'])
+        migrations.migrate(self.db)
+        c = sqlite3.connect(self.db)
+        parent = c.execute('PRAGMA foreign_key_list(tasks)').fetchone()[2]
+        self.assertTrue(parent.startswith('quarantined_agents_'), parent)
+        self.assertEqual(c.execute(f'SELECT a.name FROM tasks t JOIN "{parent}" a ON a.id=t.agent_id').fetchall(), [('Claude (foreign row)',)])
+        self.assertEqual(c.execute("SELECT role FROM agents WHERE id='claude'").fetchone()[0], 'Writing and analysis', 'the new agents table is untouched by the foreign rows')
+        self.assertEqual(c.execute('PRAGMA foreign_key_check').fetchall(), [])
+        c.close()
 
     def test_quarantine_never_moves_the_owners_own_altered_table(self):
         pr_v2_db(self.db)
@@ -366,6 +374,36 @@ class Restore(ToolCase):
             code, report = 3, {'executed': False}
         self.assertEqual((code, report['executed']), (3, False))
         self.assertEqual(file_hash(self.db), before)
+
+
+class AlternativeImplementation(ToolCase):
+    """End to end on the other implementation's real schema: inspect, quarantine, migrate, start."""
+    def test_reconciliation_path_preserves_every_foreign_row_and_ends_at_the_latest_schema(self):
+        alt_db(self.db)
+        code, report = run('inspect', '--db', str(self.db))
+        self.assertEqual((code, report['classification']), (3, 'conflicting: tables from another implementation'))
+        before = {t: v['rows'] for t, v in report['tables'].items()}
+        code, report = run('migrate-check', '--db', str(self.db))
+        self.assertEqual(code, 3)
+        code, report = run('quarantine', '--db', str(self.db), '--out', str(self.dir / 'bk'), '--execute')
+        self.assertEqual((code, report['executed'], report['conflicts_remaining']), (0, True, []))
+        self.assertEqual(sorted(report['would_rename']), ['agents'])
+        self.assertEqual(report['references_that_will_follow_the_rename'], ['tasks.agent_id -> agents'])
+        code, report = run('migrate-check', '--db', str(self.db))
+        self.assertEqual((code, report['result']), (0, 'OK'))
+        migrations.migrate(self.db)
+        c = sqlite3.connect(self.db)
+        quarantined = report_name = next(n for (n,) in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'quarantined_agents_%'"))
+        for table in ('tasks', 'task_history', 'task_migrations', 'captures'):
+            self.assertEqual(c.execute(f'SELECT COUNT(*) FROM {table}').fetchone()[0], before[table], table)
+        self.assertEqual(c.execute(f'SELECT COUNT(*) FROM "{quarantined}"').fetchone()[0], before['agents'])
+        self.assertEqual(c.execute('PRAGMA foreign_key_list(tasks)').fetchone()[2], quarantined)
+        self.assertEqual(c.execute('SELECT COUNT(*) FROM agents').fetchone()[0], 5)
+        self.assertEqual(c.execute('SELECT COUNT(*) FROM agent_tasks').fetchone()[0], 0, 'nothing is imported implicitly')
+        self.assertEqual(c.execute('PRAGMA integrity_check').fetchone()[0], 'ok')
+        self.assertEqual(c.execute('PRAGMA foreign_key_check').fetchall(), [])
+        c.close()
+        self.assertTrue(report_name)
 
 
 if __name__ == '__main__':

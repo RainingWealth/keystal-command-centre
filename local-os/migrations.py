@@ -131,6 +131,12 @@ MIGRATIONS = [
         "CREATE TRIGGER agent_tasks_approved_only_when_completed_insert BEFORE INSERT ON agent_tasks WHEN NEW.review_state='approved' AND NEW.status!='completed' BEGIN SELECT RAISE(ABORT,'an approved review belongs to a completed task'); END",
         "CREATE TRIGGER agent_tasks_approved_only_when_completed_update BEFORE UPDATE ON agent_tasks WHEN NEW.review_state='approved' AND NEW.status!='completed' BEGIN SELECT RAISE(ABORT,'an approved review belongs to a completed task'); END",
     ]),
+    ('edit revision on every task (optimistic concurrency, ported from the other local implementation)', [
+        "ALTER TABLE agent_tasks ADD COLUMN revision INTEGER NOT NULL DEFAULT 1",
+        # Every write path bumps it, including ones added later: a second browser tab saving over a newer version is
+        # refused with 409 instead of silently winning. recursive_triggers is off, so the inner UPDATE does not loop.
+        "CREATE TRIGGER agent_tasks_revision AFTER UPDATE ON agent_tasks WHEN NEW.revision = OLD.revision BEGIN UPDATE agent_tasks SET revision = OLD.revision + 1 WHERE id = NEW.id; END",
+    ]),
 ]
 LATEST = len(MIGRATIONS)
 

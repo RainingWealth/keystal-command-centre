@@ -345,5 +345,46 @@ class AuthorityWording(unittest.TestCase):
         self.assertFalse(re.search(pattern, 'ClickUp owns business commitments; Hermes Kanban owns internal agent execution', re.I))
 
 
+class Revisions(Api):
+    """Ported from the other local implementation: every write path refuses a stale revision."""
+    def test_every_write_path_refuses_a_stale_revision_and_changes_nothing(self):
+        tid = self.task(agent_id='hermes')
+        rev = self.detail(tid)['task']['revision']
+        self.assertEqual(self.post('note', {'id': tid, 'note': 'bump', 'revision': rev})[0], 201)
+        stale = rev
+        current = self.detail(tid)['task']['revision']
+        self.assertGreater(current, stale)
+        before = self.detail(tid)
+        attempts = {'update': {'priority': 'high'}, 'status': {'status': 'running'}, 'note': {'note': 'x'}, 'evidence': {'label': 'x'},
+                    'link': {'provider': 'clickup', 'scope': 'w', 'external_id': 'rev-1'}, 'session': {'session_ref': 'rev-s'}, 'unlink': {'ref_id': 1}}
+        for path, body in attempts.items():
+            code, data = self.post(path, {'id': tid, 'revision': stale, **body})
+            self.assertEqual(code, 409, path)
+            self.assertIn('changed since you opened it', data['error'])
+        after = self.detail(tid)
+        self.assertEqual((after['task'], after['history'], after['refs'], after['sessions']), (before['task'], before['history'], before['refs'], before['sessions']))
+        self.post('status', {'id': tid, 'status': 'awaiting_review'})
+        self.assertEqual(self.post('review', {'id': tid, 'decision': 'reject', 'note': 'x', 'revision': stale})[0], 409)
+        for bad in ('1', True, 1.5, None):
+            self.assertEqual(self.post('note', {'id': tid, 'note': 'x', 'revision': bad})[0], 400, bad)
+
+    def test_every_write_bumps_the_revision_including_the_servers_own(self):
+        tid = self.task(agent_id='codex')
+        seen = [self.detail(tid)['task']['revision']]
+        for path, body in (('update', {'priority': 'high'}), ('status', {'status': 'running'}), ('note', {'note': 'x'}), ('evidence', {'label': 'x'}),
+                           ('session', {'session_ref': 'bump-s'}), ('link', {'provider': 'clickup', 'scope': 'w', 'external_id': 'bump-1'})):
+            self.assertIn(self.post(path, {'id': tid, **body})[0], (200, 201), path)
+            seen.append(self.detail(tid)['task']['revision'])
+        self.assertEqual(seen, sorted(set(seen)), 'strictly increasing')
+        db = sqlite3.connect(self.server.data / 'workbench.sqlite3')
+        db.execute("UPDATE agent_tasks SET updated='2000-01-01T00:00:00+00:00' WHERE id=?", (tid,))
+        db.commit(); db.close()
+        before = self.detail(tid)['task']['revision']
+        self.c.state()  # the stale sweep is a server write path too
+        task = self.detail(tid)['task']
+        self.assertEqual(task['status'], 'stale')
+        self.assertGreater(task['revision'], before)
+
+
 if __name__ == '__main__':
     unittest.main()

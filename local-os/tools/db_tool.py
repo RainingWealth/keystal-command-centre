@@ -279,26 +279,20 @@ def cmd_quarantine(args):
         names = [x['name'] for x in table_conflicts]
         rename = {n: f'quarantined_{n}_{suffix}' for n in names if n in live}
         clash = [new for new in rename.values() if new in live]
-        outside = _referencing_sql(c, names, names) if names else []
-        # Foreign keys elsewhere that point at a table we would rename would silently re-point at the NEW table of that
-        # name after migration (SQLite resolves REFERENCES by name). Refuse instead of re-parenting someone's rows.
-        fk_refs = sorted({f'{t}.{fk[3]} -> {fk[2]}' for t in live if t not in names for fk in c.execute(f'PRAGMA foreign_key_list({qi(t)})') if fk[2] in names})
-        owned = {r[0]: (r[1], r[2]) for r in c.execute("SELECT name,type,sql FROM sqlite_master WHERE type IN ('index','trigger') AND tbl_name IN (%s) AND sql IS NOT NULL" % ','.join('?' * len(names)), names)} if names else {}
-        stray = {x['name'] for x in object_conflicts} - set(owned)
+        # Renamed the modern way: SQLite rewrites foreign keys, triggers and views that name a renamed table, so the other
+        # implementation's rows keep pointing at ITS table (now quarantined), never at the new Keystal table of the same name.
+        follows = sorted({f'{t}.{fk[3]} -> {fk[2]}' for t in live if t not in names for fk in c.execute(f'PRAGMA foreign_key_list({qi(t)})') if fk[2] in names})
+        follows += sorted(_referencing_sql(c, names, names)) if names else []
+        stray = sorted({x['name'] for x in object_conflicts})
     finally:
         c.close()
-    report = {'database': str(db.resolve()), 'would_rename': rename, 'would_drop_indexes_and_triggers_of_those_tables': sorted(owned), 'would_drop_other_colliding_objects': sorted(stray),
-              'conflicts': plan['conflicts'], 'executed': False,
-              'note': 'Data is renamed, never deleted. Index/trigger definitions are saved next to the backup. Importing the other implementation\'s data into this schema is a separate, reviewed step.'}
-    blockers = []
+    report = {'database': str(db.resolve()), 'would_rename': rename, 'would_drop_colliding_indexes_and_triggers': stray,
+              'references_that_will_follow_the_rename': follows, 'conflicts': plan['conflicts'], 'executed': False,
+              'note': "Data is renamed, never deleted. Foreign keys, views and triggers that point at a renamed table are rewritten to "
+                      "point at its quarantined name. Only index/trigger names that collide with this schema are dropped, and their "
+                      "definitions are saved next to the backup. Importing the other implementation's rows is a separate, reviewed step."}
     if clash:
-        blockers.append(f'target name(s) already exist: {clash}')
-    if outside:
-        blockers.append(f'views/triggers on other tables mention these tables and need manual review: {sorted(outside)}')
-    if fk_refs:
-        blockers.append(f'foreign keys in other tables point at these tables and would silently re-point at the new tables of the same name: {fk_refs}')
-    if blockers:
-        report['refused'] = blockers
+        report['refused'] = [f'target name(s) already exist: {clash}']
         return report, 3
     if not args.execute:
         report['result'] = 'Dry run. Re-run with --execute to apply (a verified backup is taken first).'
@@ -314,37 +308,41 @@ def cmd_quarantine(args):
     saved = backup_path.with_suffix('.ddl.json')
     c = sqlite3.connect(db, isolation_level=None, timeout=15)
     try:
+        c.execute('PRAGMA legacy_alter_table=OFF')
         c.execute('BEGIN IMMEDIATE')
         try:
             ddl = {}
-            for name in sorted(stray):
+            for name in stray:
                 row = c.execute("SELECT type,sql FROM sqlite_master WHERE name=? AND type IN ('index','trigger')", (name,)).fetchone()
                 if row and row[1]:
                     ddl[name] = row[1]
                     c.execute(f'DROP {"INDEX" if row[0] == "index" else "TRIGGER"} {qi(name)}')
-            for name, (kind, sql) in owned.items():
-                ddl[name] = sql
-                c.execute(f'DROP {"INDEX" if kind == "index" else "TRIGGER"} {qi(name)}')
-            c.execute('PRAGMA legacy_alter_table=ON')
             for old, new in rename.items():
                 c.execute(f'ALTER TABLE {qi(old)} RENAME TO {qi(new)}')
+            dangling = sorted({f'{t}.{fk[3]} -> {fk[2]}' for t in tables_of(c) for fk in c.execute(f'PRAGMA foreign_key_list({qi(t)})') if fk[2] in rename})
+            if dangling:
+                raise RuntimeError(f'references still name the old tables after the rename: {dangling}')
+            if c.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+                raise RuntimeError('integrity_check failed after the rename')
             c.execute('COMMIT')
-        except BaseException:
+        except BaseException as exc:
             c.execute('ROLLBACK')
-            raise
+            report['refused'] = [f'Rolled back, nothing was changed: {type(exc).__name__}: {str(exc)[:300]}']
+            return report, 3
     finally:
         c.close()
     saved.write_text(json.dumps(ddl, indent=2))
     os.chmod(saved, 0o600)
-    after = plan_after = migrations.plan(db)
+    after = migrations.plan(db)
     report.update(executed=True, backup=str(backup_path), backup_verified=verified, saved_definitions=str(saved), conflicts_remaining=after['conflicts'],
                   result='Quarantined. Run migrate-check, then start the server with --migrate.' if not after['conflicts'] else 'Quarantined the foreign tables, but conflicts remain (listed). Do not migrate yet.')
-    return report, 3 if plan_after['conflicts'] else 0
+    return report, 3 if after['conflicts'] else 0
 
 
 SCHEMA_CODE = {0: 'the original app (main 3735b38) opens it as is; this branch opens it only after --migrate',
                2: 'PR #1 head e0aea41 opens it as is; this branch opens it only after --migrate',
-               3: 'this branch (corrective pass) opens it as is; PR #1 head e0aea41 and the original app cannot'}
+               3: 'the corrective-pass commits a1589e1 to b9bd4c3 open it as is; current code opens it only after --migrate',
+               4: 'current code (with edit revisions) opens it as is; no older version can'}
 
 
 def server_listening():

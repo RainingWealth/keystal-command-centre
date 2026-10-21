@@ -1,7 +1,7 @@
 'use strict';
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
-let state = null, openTaskId = '', currentThread = localStorage.getItem('keystal.thread') || '', lastMessages = '', pendingRequest = null, pollBusy = false, toastTimer;
+let state = null, openTaskId = '', openTaskRevision = null, currentThread = localStorage.getItem('keystal.thread') || '', lastMessages = '', pendingRequest = null, pollBusy = false, toastTimer;
 const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const dateLabel = (s) => s ? new Date(s).toLocaleString('en-SG', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Not checked';
 function toast(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').hidden = true, 5000); }
@@ -224,12 +224,14 @@ ${review}
 async function openTask(id) {
   try {
     const detail = await api('/api/agent-tasks/' + encodeURIComponent(id));
-    openTaskId = id; renderTaskDialog(detail);
+    openTaskId = id; openTaskRevision = detail.task.revision ?? null; renderTaskDialog(detail);
     if (!$('#task-dialog').open) $('#task-dialog').showModal();
   } catch (error) { toast(error.message); }
 }
 async function taskAction(id, path, body, message) {
-  try { await api(path, {id, ...body}); await refresh(); await openTask(id); toast(message); }
+  // Send the revision this dialog rendered: if the task changed elsewhere meanwhile, the server refuses with 409.
+  const revision = id === openTaskId && openTaskRevision != null ? {revision: openTaskRevision} : {};
+  try { await api(path, {id, ...revision, ...body}); await refresh(); await openTask(id); toast(message); }
   catch (error) { toast(error.message); }
 }
 function showTasks(agent, status) {

@@ -185,6 +185,17 @@ def load_task(c, data):
     return row
 
 
+def check_revision(task, data):
+    """Optional optimistic concurrency: the client sends the revision it rendered; a newer one in the database wins."""
+    if 'revision' not in data:
+        return
+    revision = data['revision']
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        raise ApiError('Invalid revision')
+    if revision != task['revision']:
+        raise ApiError('This task changed since you opened it (another tab, or the server). Reload it and try again.', 409)
+
+
 def actor_for(c, task, source):
     if source == 'observed':
         return 'Keystal OS'
@@ -237,8 +248,9 @@ def create_task(c, now, data):
 
 
 def update_task(c, now, data):
-    strict(data, ('id',) + TASK_FIELDS)
+    strict(data, ('id', 'revision') + TASK_FIELDS)
     task = load_task(c, data)
+    check_revision(task, data)
     changes = {}
     if 'title' in data:
         changes['title'] = field(data, 'title', 200, required=True)
@@ -285,8 +297,9 @@ def update_task(c, now, data):
 
 
 def set_status(c, now, data):
-    strict(data, ('id', 'status', 'source', 'note', 'expected_status'))
+    strict(data, ('id', 'revision', 'status', 'source', 'note', 'expected_status'))
     task = load_task(c, data)
+    check_revision(task, data)
     new = choice(data, 'status', STATUSES, None)
     source = choice(data, 'source', CLIENT_SOURCES, 'manual')
     note = field(data, 'note', 2000)
@@ -317,8 +330,9 @@ def set_status(c, now, data):
 
 
 def add_note(c, now, data):
-    strict(data, ('id', 'note', 'source'))
+    strict(data, ('id', 'revision', 'note', 'source'))
     task = load_task(c, data)
+    check_revision(task, data)
     source = choice(data, 'source', CLIENT_SOURCES, 'manual')
     note = field(data, 'note', 2000, required=True)
     c.execute('UPDATE agent_tasks SET updated=? WHERE id=?', (now, task['id']))
@@ -328,8 +342,9 @@ def add_note(c, now, data):
 
 
 def add_evidence(c, now, data):
-    strict(data, ('id', 'label', 'url', 'note', 'source'))
+    strict(data, ('id', 'revision', 'label', 'url', 'note', 'source'))
     task = load_task(c, data)
+    check_revision(task, data)
     source = choice(data, 'source', CLIENT_SOURCES, 'manual')
     label = field(data, 'label', 120, required=True)
     url = evidence_url(data.get('url'))
@@ -342,8 +357,9 @@ def add_evidence(c, now, data):
 
 
 def review_task(c, now, data):
-    strict(data, ('id', 'decision', 'note'))
+    strict(data, ('id', 'revision', 'decision', 'note'))
     task = load_task(c, data)
+    check_revision(task, data)
     decision = choice(data, 'decision', ('approve', 'reject'), None)
     note = field(data, 'note', 2000)
     if task['status'] != 'awaiting_review':
@@ -376,8 +392,9 @@ def _ref_part(data, key, pattern, required=True):
 def link_task(c, now, data):
     """Record that a local task corresponds to a record in a system that owns that record.
     Nothing is written to that system, and the task's own status is not overwritten by it."""
-    strict(data, ('id', 'provider', 'external_id', 'scope', 'context', 'url', 'label'))
+    strict(data, ('id', 'revision', 'provider', 'external_id', 'scope', 'context', 'url', 'label'))
     task = load_task(c, data)
+    check_revision(task, data)
     provider = choice(data, 'provider', PROVIDERS, None)
     external_id = _ref_part(data, 'external_id', REF_ID)
     label = field(data, 'label', 120)
@@ -419,8 +436,9 @@ def link_task(c, now, data):
 
 
 def unlink_task(c, now, data):
-    strict(data, ('id', 'ref_id'))
+    strict(data, ('id', 'revision', 'ref_id'))
     task = load_task(c, data)
+    check_revision(task, data)
     ref_id = data.get('ref_id')
     if not isinstance(ref_id, int) or isinstance(ref_id, bool):
         raise ApiError('Invalid ref_id')
@@ -436,8 +454,9 @@ def unlink_task(c, now, data):
 
 def add_session(c, now, data):
     """Attach an opaque session/run identifier from an agent's own system. Identifiers only, never transcripts."""
-    strict(data, ('id', 'agent_id', 'session_ref', 'run_ref', 'note', 'source'))
+    strict(data, ('id', 'revision', 'agent_id', 'session_ref', 'run_ref', 'note', 'source'))
     task = load_task(c, data)
+    check_revision(task, data)
     source = choice(data, 'source', CLIENT_SOURCES, 'manual')
     agent_id = agent_ref(c, data.get('agent_id') or task['agent_id'])
     if not agent_id:
