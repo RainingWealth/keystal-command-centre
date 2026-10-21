@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))
 import db_tool  # noqa: E402
 import migrations  # noqa: E402
-from test_migrations import alt_db, foreign_db, legacy_db, pr_v2_db, file_hash, dump  # noqa: E402
+from test_migrations import alt_db, foreign_db, legacy_db, pr_v2_db, file_hash, dump, interrupted_writer  # noqa: E402
 
 
 def run(*argv):
@@ -250,12 +250,7 @@ class Quarantine(ToolCase):
 class ReviewFindings(ToolCase):
     def test_a_hot_journal_is_reported_with_instructions_not_a_traceback(self):
         migrations.migrate(self.db)
-        import subprocess
-        code = f"""import sqlite3,os
-c=sqlite3.connect({str(self.db)!r},isolation_level=None); c.execute('PRAGMA cache_size=1'); c.execute('BEGIN IMMEDIATE')
-for i in range(3000): c.execute("INSERT INTO events(kind,label,created) VALUES('x',?,'n')",('y'*200,))
-os._exit(9)"""
-        subprocess.run([sys.executable, '-c', code])
+        interrupted_writer(self.db)
         for cmd in (['inspect'], ['backup', '--out', str(self.dir / 'bk')], ['migrate-check'], ['quarantine']):
             code_, report = run(*cmd, '--db', str(self.db))
             self.assertEqual(code_, 3, cmd)

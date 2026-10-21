@@ -1,5 +1,6 @@
 import hashlib
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -116,6 +117,29 @@ def dump(path):
 
 def file_hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+JOURNAL_MAGIC = bytes.fromhex('d9d505f920a163d7')
+
+
+def interrupted_writer(db):
+    """Leave `db` as a writer that died mid-transaction does: a HOT journal that a read-only connection cannot roll back.
+    synchronous=OFF makes SQLite write the journal header as soon as the journal opens. With the default, the header
+    stays zero until pages spill or commit, and some SQLite builds (seen on macOS) keep all 3000 rows in cache: the
+    journal is then not hot and nothing needs recovery, which is correct but not the case these tests are about."""
+    code = f"""import sqlite3,os
+c=sqlite3.connect({str(db)!r},isolation_level=None); c.execute('PRAGMA synchronous=OFF'); c.execute('PRAGMA cache_size=1'); c.execute('BEGIN IMMEDIATE')
+for i in range(3000): c.execute("INSERT INTO events(kind,label,created) VALUES('x',?,'n')",('y'*200,))
+os._exit(9)"""
+    child = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+    journal = Path(str(db) + '-journal')
+    head = journal.read_bytes()[:8] if journal.exists() else None
+    if child.returncode != 9 or head != JOURNAL_MAGIC:
+        c = sqlite3.connect(':memory:')
+        options = [r[0] for r in c.execute('PRAGMA compile_options')]
+        c.close()
+        raise AssertionError(f'test setup could not create a hot journal (child exit {child.returncode}, journal head {head.hex() if head else None}); '
+                             f'SQLite {sqlite3.sqlite_version}, Python {sys.version.split()[0]} on {sys.platform}, compile options {options}, child stderr {child.stderr[-500:]!r}')
 
 
 class MigrationTests(unittest.TestCase):
@@ -560,12 +584,7 @@ class ReviewFindings(unittest.TestCase):
         self.assertIn('foreign key mismatch', state['invariants']['foreign_key_check_error'])
 
     def interrupted(self, db):
-        code = f"""import sqlite3,os
-c=sqlite3.connect({str(db)!r},isolation_level=None); c.execute('PRAGMA cache_size=1'); c.execute('BEGIN IMMEDIATE')
-for i in range(3000): c.execute("INSERT INTO events(kind,label,created) VALUES('x',?,'n')",('y'*200,))
-os._exit(9)"""
-        import subprocess
-        subprocess.run([sys.executable, '-c', code])
+        interrupted_writer(db)
         self.assertTrue(migrations.needs_recovery(db))
 
     def test_a_hot_journal_is_reported_and_recovered_by_a_normal_open(self):

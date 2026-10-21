@@ -575,16 +575,13 @@ class StartupSafety(unittest.TestCase):
         self.assertEqual(sorted(p.name for p in root.iterdir()), ['Keystal #2'], 'no stray file next to the folder')
 
     def test_an_interrupted_transaction_is_recovered_at_startup(self):
-        import subprocess, tempfile
+        import tempfile
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
         import migrations
+        from test_migrations import interrupted_writer
         d = Path(tempfile.mkdtemp())
         migrations.migrate(d / 'workbench.sqlite3')
-        code = f"""import sqlite3,os
-c=sqlite3.connect({str(d / 'workbench.sqlite3')!r},isolation_level=None); c.execute('PRAGMA cache_size=1'); c.execute('BEGIN IMMEDIATE')
-for i in range(3000): c.execute("INSERT INTO events(kind,label,created) VALUES('x',?,'n')",('y'*200,))
-os._exit(9)"""
-        subprocess.run([sys.executable, '-c', code])
+        interrupted_writer(d / 'workbench.sqlite3')
         self.assertTrue(migrations.needs_recovery(d / 'workbench.sqlite3'))
         s = Server(data=d)
         s.start()
