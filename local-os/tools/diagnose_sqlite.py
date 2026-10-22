@@ -6,7 +6,9 @@ Used to explain platform-specific test results (the hot-journal tests and the co
     python3 local-os/tools/diagnose_sqlite.py
 """
 import contextlib
+import hashlib
 import io
+import os
 import json
 import platform
 import shutil
@@ -57,30 +59,57 @@ def defaults(db):
         c.close()
 
 
+def digest(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def guarded(fn, *args):
+    started = time.monotonic()
+    try:
+        return {'result': fn(*args), 'seconds': round(time.monotonic() - started, 2)}
+    except Exception as exc:
+        return {'error': error_of(exc), 'seconds': round(time.monotonic() - started, 2)}
+
+
 def interrupted(db, pragmas):
     """The test fixture: a child process dies mid-transaction. Reports what it left behind and what SQLite makes of it."""
-    size = db.stat().st_size
-    code = f"""import sqlite3,os
+    size, before = db.stat().st_size, digest(db)
+    code = f"""import sqlite3,os,json
 c=sqlite3.connect({str(db)!r},isolation_level=None)
 for p in {pragmas!r}: c.execute(p)
+print(json.dumps({{k: c.execute('PRAGMA '+k).fetchone()[0] for k in ('cache_size','cache_spill','synchronous','journal_mode')}}),flush=True)
 c.execute('BEGIN IMMEDIATE')
 for i in range(3000): c.execute("INSERT INTO events(kind,label,created) VALUES('x',?,'n')",('y'*200,))
 os._exit(9)"""
     child = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
     journal = Path(str(db) + '-journal')
     head = journal.read_bytes()[:8].hex() if journal.exists() else None
-    report = {'child_pragmas': pragmas, 'child_exit': child.returncode, 'child_stderr': child.stderr[-300:], 'journal_exists': journal.exists(),
-              'journal_head': head, 'journal_is_hot_by_header': head == MAGIC, 'db_bytes_before': size, 'db_bytes_after': db.stat().st_size}
+    report = {'child_pragmas': pragmas, 'child_settings': child.stdout.strip(), 'child_exit': child.returncode, 'child_stderr': child.stderr[-300:],
+              'files_left': sorted(x.name for x in db.parent.iterdir() if x.name.startswith(db.name)),
+              'journal_head': head, 'journal_is_hot_by_header': head == MAGIC, 'db_bytes_before': size, 'db_bytes_after': db.stat().st_size,
+              'db_changed_by_child': digest(db) != before}
     c = sqlite3.connect(migrations.ro_uri(db), uri=True, timeout=5)
     try:
-        c.execute('SELECT COUNT(*) FROM sqlite_master').fetchone()
-        report['read_only_open'] = 'succeeded'
+        report['read_only_open'] = {'succeeded': True, 'events_rows_seen': c.execute('SELECT COUNT(*) FROM events').fetchone()[0]}
     except sqlite3.Error as exc:
         report['read_only_open'] = error_of(exc)
     finally:
         c.close()
-    report['needs_recovery'] = migrations.needs_recovery(db)
+    report['needs_recovery'] = guarded(migrations.needs_recovery, db)
+    report['recover'] = guarded(migrations.recover, db)
+    report['db_identical_to_before_after_recover'] = digest(db) == before
     return report
+
+
+def filesystem(path):
+    """df and mount facts for the folder holding `path` (metadata only)."""
+    path = Path(path).expanduser().resolve()
+    while not path.exists():
+        path = path.parent
+    df = subprocess.run(['df', '-P', str(path)], capture_output=True, text=True).stdout.strip().splitlines()
+    mountpoint = df[-1].split()[-1] if len(df) > 1 else None
+    mounts = subprocess.run(['/sbin/mount'] if Path('/sbin/mount').exists() else ['mount'], capture_output=True, text=True).stdout.splitlines()
+    return {'folder': str(path), 'df': df[-1] if df else None, 'mount': next((m for m in mounts if mountpoint and f' on {mountpoint} ' in m), None)}
 
 
 def concurrent(db, outdir, seconds, writer_in_process):
@@ -140,7 +169,8 @@ def main():
     tmp = Path(tempfile.mkdtemp(prefix='keystal-sqlite-diagnose-'))
     try:
         report = {'platform': platform.platform(), 'python': sys.version, 'executable': sys.executable, 'sqlite_version': sqlite3.sqlite_version,
-                  'library': library(), 'temp_folder': {'as_given': str(tmp), 'resolved': str(tmp.resolve())}}
+                  'library': library(), 'temp_folder': {'as_given': str(tmp), 'resolved': str(tmp.resolve())},
+                  'filesystems': {'temp': guarded(filesystem, tmp), 'keystal_data': guarded(filesystem, os.environ.get('KEYSTAL_OS_DATA', '~/Keystal/outputs/keystal-os/local-state'))}}
         db = tmp / 'defaults.sqlite3'
         migrations.migrate(db)
         report['defaults'] = defaults(db)
@@ -148,8 +178,8 @@ def main():
         for name, pragmas in (('test_fixture_before_fix', ['PRAGMA cache_size=1']), ('test_fixture_after_fix', ['PRAGMA synchronous=OFF', 'PRAGMA cache_size=1'])):
             db = tmp / f'{name}.sqlite3'
             migrations.migrate(db)
-            report['hot_journal'][name] = interrupted(db, pragmas)
-        report['concurrent_backup'] = [concurrent(tmp / f'concurrent-{i}.sqlite3', tmp / f'bk-{i}', 8, in_process) for i, in_process in enumerate((True, False))]
+            report['hot_journal'][name] = guarded(interrupted, db, pragmas)
+        report['concurrent_backup'] = [guarded(concurrent, tmp / f'concurrent-{i}.sqlite3', tmp / f'bk-{i}', 8, in_process) for i, in_process in enumerate((True, False))]
         print(json.dumps(report, indent=2))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

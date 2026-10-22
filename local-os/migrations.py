@@ -284,8 +284,9 @@ def ro_uri(db):
 
 def needs_recovery(db, attempts=3, pause=0.25):
     """True when SQLite itself says a HOT journal must be rolled back (a writer died mid-transaction), which a read-only
-    connection cannot do. A journal that exists because a live writer is mid-transaction is not hot: reads just wait.
-    A live writer that is itself rolling back can look hot for a moment, so the answer is True only if it persists."""
+    connection cannot do. A journal that exists because a live writer is mid-transaction is not hot: reads wait for it
+    (up to BUSY_TIMEOUT, then 'database is locked' is raised). A live writer that is itself rolling back can look hot for
+    a moment, so the answer is True only if it persists."""
     db = Path(db)
     for attempt in range(attempts):
         if not db.exists():
@@ -295,7 +296,9 @@ def needs_recovery(db, attempts=3, pause=0.25):
             c.execute('SELECT COUNT(*) FROM sqlite_master').fetchone()
             return False
         except sqlite3.OperationalError as exc:
-            if 'readonly' not in str(exc).lower() and 'read-only' not in str(exc).lower():
+            code = getattr(exc, 'sqlite_errorcode', None)  # Python 3.11+; older Pythons only have the message
+            hot = code == 776 if code is not None else ('readonly' in str(exc).lower() or 'read-only' in str(exc).lower())  # 776 = SQLITE_READONLY_ROLLBACK
+            if not hot:
                 raise
         finally:
             c.close()

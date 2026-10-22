@@ -85,13 +85,17 @@ def startup_checks():
 
 def init(migrate_ok=False):
     """Open the database. A database that already holds data is only migrated on an explicit --migrate."""
-    state = migrations.plan(DB)
-    if state.get('needs_recovery'):
-        # A writer died mid-transaction (power loss, kill, Ctrl+C during a write). SQLite rolls the interrupted
-        # transaction back on any read-write open; the original server did this implicitly on every start.
-        result = migrations.recover(DB)
-        print(f'NOTE: {DB} had an interrupted transaction; SQLite rolled it back (integrity_check: {result}).', file=sys.stderr)
+    try:
         state = migrations.plan(DB)
+        if state.get('needs_recovery'):
+            # A writer died mid-transaction (power loss, kill, Ctrl+C during a write). SQLite rolls the interrupted
+            # transaction back on any read-write open; the original server did this implicitly on every start.
+            result = migrations.recover(DB)
+            print(f'NOTE: {DB} had an interrupted transaction; SQLite rolled it back (integrity_check: {result}).', file=sys.stderr)
+            state = migrations.plan(DB)
+    except sqlite3.Error as exc:
+        refuse(f'{DB} could not be opened: {exc}. If another program is writing to it (a second Keystal server, a sync tool), stop it and start again. '
+               f'Nothing was changed. Details: python3 local-os/tools/db_tool.py inspect --db "{DB}"')
     if state.get('invalid_version'):
         refuse(f"{DB} has user_version {state['current']}, which this code never writes. Refusing to open it. Nothing was changed.")
     if state.get('newer_than_code'):

@@ -598,11 +598,13 @@ class ReviewFindings(unittest.TestCase):
     def test_a_hot_journal_is_reported_and_recovered_by_a_normal_open(self):
         db = self.root / 'w.sqlite3'
         migrations.migrate(db)
+        before = file_hash(db)
         self.interrupted(db)
         self.assertTrue(migrations.plan(db)['needs_recovery'])
         with self.assertRaisesRegex(RuntimeError, 'interrupted transaction'):
             migrations.migrate(db)
         self.assertEqual(migrations.recover(db), 'ok')
+        self.assertEqual(file_hash(db), before, 'rolled back to exactly the bytes before the interrupted transaction')
         state = migrations.plan(db)
         self.assertEqual((state.get('needs_recovery'), state['current'], state['pending']), (None, migrations.LATEST, 0))
         c = sqlite3.connect(db)

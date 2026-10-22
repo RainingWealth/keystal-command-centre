@@ -632,6 +632,18 @@ class StartupSafety(unittest.TestCase):
         finally:
             s.stop(); s.tmp.cleanup()
 
+    def test_a_database_that_cannot_be_opened_stops_the_server_with_a_message(self):
+        import tempfile
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        import migrations
+        d = Path(tempfile.mkdtemp())
+        migrations.migrate(d / 'workbench.sqlite3')
+        (d / 'workbench.sqlite3-journal').mkdir()  # a journal SQLite cannot read
+        code, message = Server(data=d).run_to_exit()
+        self.assertEqual(code, 2, message)
+        self.assertIn('could not be opened', message)
+        self.assertNotIn('Traceback', message)
+
     def test_a_negative_user_version_stops_the_server(self):
         import tempfile
         from test_migrations import legacy_db
