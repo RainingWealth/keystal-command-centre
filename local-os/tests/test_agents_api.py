@@ -619,11 +619,11 @@ class StartupSafety(unittest.TestCase):
         import tempfile
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
         import migrations
-        from test_migrations import interrupted_writer
+        from test_migrations import interrupted_writer, sqlite_facts
         d = Path(tempfile.mkdtemp())
         migrations.migrate(d / 'workbench.sqlite3')
         interrupted_writer(d / 'workbench.sqlite3')
-        self.assertTrue(migrations.needs_recovery(d / 'workbench.sqlite3'))
+        self.assertTrue(migrations.needs_recovery(d / 'workbench.sqlite3'), f'the journal is hot, yet a read-only open did not refuse it; {sqlite_facts()}')
         s = Server(data=d)
         s.start()
         try:

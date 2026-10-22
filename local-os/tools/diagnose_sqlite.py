@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.request
 from pathlib import Path
 
 LOCAL_OS = Path(__file__).resolve().parent.parent
@@ -133,6 +134,9 @@ except sqlite3.Error as e:
 
 
 def main():
+    # The test suite looks up proxies through urllib, which on macOS starts system dispatch threads. Apple's SQLite has
+    # been reported to return 'disk I/O error' only once such threads are running, so do the same before testing.
+    urllib.request.getproxies()
     tmp = Path(tempfile.mkdtemp(prefix='keystal-sqlite-diagnose-'))
     try:
         report = {'platform': platform.platform(), 'python': sys.version, 'executable': sys.executable, 'sqlite_version': sqlite3.sqlite_version,

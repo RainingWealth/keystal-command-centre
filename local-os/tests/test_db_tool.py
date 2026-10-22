@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'tools'))
 import db_tool  # noqa: E402
 import migrations  # noqa: E402
-from test_migrations import alt_db, foreign_db, legacy_db, pr_v2_db, file_hash, dump, interrupted_writer  # noqa: E402
+from test_migrations import alt_db, foreign_db, legacy_db, pr_v2_db, file_hash, dump, interrupted_writer, sqlite_facts  # noqa: E402
 
 
 def run(*argv):
@@ -251,7 +251,7 @@ class ReviewFindings(ToolCase):
         interrupted_writer(self.db)
         for cmd in (['inspect'], ['backup', '--out', str(self.dir / 'bk')], ['migrate-check'], ['quarantine']):
             code_, report = run(*cmd, '--db', str(self.db))
-            self.assertEqual(code_, 3, cmd)
+            self.assertEqual(code_, 3, f'{cmd}: the journal is hot, yet a read-only open did not refuse it; {sqlite_facts()}')
             self.assertIn('NEEDS RECOVERY', report['result'])
         self.assertTrue(Path(str(self.db) + '-journal').exists(), 'the tool did not touch the journal')
 

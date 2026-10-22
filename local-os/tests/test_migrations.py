@@ -136,11 +136,18 @@ os._exit(9)"""
     journal = Path(str(db) + '-journal')
     head = journal.read_bytes()[:8] if journal.exists() else None
     if child.returncode != 9 or head != JOURNAL_MAGIC:
-        c = sqlite3.connect(':memory:')
-        options = [r[0] for r in c.execute('PRAGMA compile_options')]
-        c.close()
         raise AssertionError(f'test setup could not create a hot journal (child exit {child.returncode}, journal head {head.hex() if head else None}); '
-                             f'SQLite {sqlite3.sqlite_version}, Python {sys.version.split()[0]} on {sys.platform}, compile options {options}, child stderr {child.stderr[-500:]!r}')
+                             f'{sqlite_facts()}, child stderr {child.stderr[-500:]!r}')
+
+
+def sqlite_facts():
+    """For failure messages: which SQLite this Python runs, so a platform-specific result can be explained."""
+    c = sqlite3.connect(':memory:')
+    try:
+        options = [r[0] for r in c.execute('PRAGMA compile_options')]
+    finally:
+        c.close()
+    return f'SQLite {sqlite3.sqlite_version}, Python {sys.version.split()[0]} on {sys.platform}, compile options {options}'
 
 
 class MigrationTests(unittest.TestCase):
@@ -586,7 +593,7 @@ class ReviewFindings(unittest.TestCase):
 
     def interrupted(self, db):
         interrupted_writer(db)
-        self.assertTrue(migrations.needs_recovery(db))
+        self.assertTrue(migrations.needs_recovery(db), f'the journal is hot, yet a read-only open did not refuse it; {sqlite_facts()}')
 
     def test_a_hot_journal_is_reported_and_recovered_by_a_normal_open(self):
         db = self.root / 'w.sqlite3'
