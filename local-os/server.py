@@ -117,10 +117,21 @@ def event(c, kind, label):
 def meta(c, key, value):
     c.execute('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)', (key, json.dumps(value)))
 
+def sweep_orphan_runs(c, stamp):
+    """A run still 'running' while no turn holds BUSY lost its result: the bridge could not record it (details on stderr)."""
+    if c.execute("SELECT 1 FROM runs WHERE status='running' LIMIT 1").fetchone() and BUSY.acquire(blocking=False):
+        try:
+            c.execute("UPDATE runs SET status='interrupted',error=?,ended=? WHERE status='running'",
+                      ('The local bridge stopped without recording a result (details are in the server window). Nothing was retried.', stamp))
+            event(c, 'error', 'A Keystal turn ended without a recorded result — no completed result claimed')
+        finally:
+            BUSY.release()
+
 def getstate():
     with connect() as c:
         stamp = now()
         agent_tasks.sweep_stale(c, stamp)
+        sweep_orphan_runs(c, stamp)
         runtime = {'mode': 'local', 'bridge_available': bool(HERMES), 'busy': BUSY.locked(), 'hosted': False, 'chat_scope': 'Drafting + public web research', 'preview_label': PREVIEW_LABEL}
         kanban = agent_tasks.kanban_view(c, stamp)
         return {
@@ -148,7 +159,8 @@ BUSY_READ = object()
 def refresh_kanban(manual=False):
     """Read-only refresh of the Hermes Kanban snapshot. Returns the stored read bookkeeping, or BUSY_READ if a read is
     already running. The configured board is used exactly as named; it is never replaced by a default. Anything that
-    goes wrong is recorded as a failed attempt (the last good snapshot is kept), never silently dropped."""
+    goes wrong is recorded as a failed attempt (the last good snapshot is kept). Returns None only when even that record
+    could not be written; callers must report that, never the previous result."""
     if not KANBAN_BUSY.acquire(blocking=False):
         return BUSY_READ
     board = KANBAN_BOARD or None
@@ -214,10 +226,13 @@ def run_hermes(run_id, thread_id, prompt, session_id):
         BUSY.release()
 
 def fail(run_id, error):
-    with connect() as c:
-        c.execute("UPDATE runs SET status='failed',ended=?,error=? WHERE id=?", (now(), error, run_id))
-        meta(c, 'chat', {'status': 'failed', 'checked_at': now(), 'detail': error})
-        event(c, 'error', 'Keystal turn failed — no completed result claimed')
+    try:
+        with connect() as c:
+            c.execute("UPDATE runs SET status='failed',ended=?,error=? WHERE id=?", (now(), error, run_id))
+            meta(c, 'chat', {'status': 'failed', 'checked_at': now(), 'detail': error})
+            event(c, 'error', 'Keystal turn failed — no completed result claimed')
+    except Exception:
+        traceback.print_exc()  # the run stays 'running' until the next state read marks it interrupted (sweep_orphan_runs)
 
 class Handler(BaseHTTPRequestHandler):
     server_version = 'KeystalLocal/1.0'
@@ -246,6 +261,12 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
     def do_GET(self):
+        try:
+            return self.get()
+        except Exception:
+            traceback.print_exc()
+            return self.send(500, {'error': 'Local database or file error: the page could not be loaded. Details are in the server window.'})
+    def get(self):
         if not self.validhost():
             return self.send(403, {'error': 'Invalid host'})
         path = urlsplit(self.path).path
@@ -304,8 +325,11 @@ class Handler(BaseHTTPRequestHandler):
                 code, payload = agent_tasks.ROUTES[path](c, now(), data)
             return self.send(code, payload)
         if path == '/api/kanban/refresh':
-            if refresh_kanban(manual=True) is BUSY_READ:
+            result = refresh_kanban(manual=True)
+            if result is BUSY_READ:
                 return self.send(409, {'error': 'A Kanban read is already running.'})
+            if result is None:
+                return self.send(500, {'error': 'This Kanban read could not be recorded in the local database, so the panel still shows the previous read. Details are in the server window.'})
             with connect() as c:
                 return self.send(200, agent_tasks.kanban_view(c, now()))
         if path == '/api/captures':

@@ -10,7 +10,7 @@ async function api(path, body) {
   if (body !== undefined) Object.assign(options, {method:'POST', headers:{'Content-Type':'application/json','X-Keystal-CSRF':state?.csrf || ''}, body:JSON.stringify(body)});
   const response = await fetch(path, options);
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'Request failed');
+  if (!response.ok) throw Object.assign(new Error(result.error || 'Request failed'), {status: response.status});
   return result;
 }
 function setView(view) {
@@ -288,8 +288,8 @@ async function refresh() {
     $('#server-status').textContent = 'Local workspace connected';
     const label = state.runtime.preview_label || ''; $('#preview-banner').textContent = label; $('#preview-banner').hidden = !label;
   } catch (error) {
-    $('#server-status').textContent = 'Local server unavailable — reload after restarting';
-    $('#chat-status').textContent = 'Server unavailable';
+    $('#server-status').textContent = error.status ? `Local server error — ${error.message}` : 'Local server unavailable — reload after restarting';
+    $('#chat-status').textContent = error.status ? 'Server error' : 'Server unavailable';
     $('#send-message').disabled = true;
   } finally {pollBusy=false;}
 }

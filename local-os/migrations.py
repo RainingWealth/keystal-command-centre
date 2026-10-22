@@ -8,10 +8,12 @@ would create with a different shape (for example another implementation's `agent
 refused before anything is written. `CREATE TABLE IF NOT EXISTS` is not reconciliation.
 """
 import datetime as dt
+import itertools
 import os
 from pathlib import Path
 import re
 import sqlite3
+import time
 
 STATUSES = "'queued','running','awaiting_review','blocked','failed','paused','completed','stale'"
 SOURCES = "'observed','manual','agent_reported'"
@@ -272,32 +274,39 @@ def invariants(c):
     return out
 
 
+BUSY_TIMEOUT = 15  # seconds a connection waits for another writer before reporting 'database is locked'
+
+
 def ro_uri(db):
     """A read-only SQLite URI for any path: '#', '?' and '%' in a folder name must not change which file is opened."""
     return Path(db).resolve().as_uri() + '?mode=ro'
 
 
-def needs_recovery(db):
+def needs_recovery(db, attempts=3, pause=0.25):
     """True when SQLite itself says a HOT journal must be rolled back (a writer died mid-transaction), which a read-only
-    connection cannot do. A journal that exists because a live writer is mid-transaction is not hot: reads just wait."""
+    connection cannot do. A journal that exists because a live writer is mid-transaction is not hot: reads just wait.
+    A live writer that is itself rolling back can look hot for a moment, so the answer is True only if it persists."""
     db = Path(db)
-    if not db.exists():
-        return False
-    c = sqlite3.connect(ro_uri(db), uri=True, timeout=15)
-    try:
-        c.execute('SELECT COUNT(*) FROM sqlite_master').fetchone()
-        return False
-    except sqlite3.OperationalError as exc:
-        if 'readonly' in str(exc).lower() or 'read-only' in str(exc).lower():
-            return True
-        raise
-    finally:
-        c.close()
+    for attempt in range(attempts):
+        if not db.exists():
+            return False
+        c = sqlite3.connect(ro_uri(db), uri=True, timeout=BUSY_TIMEOUT)
+        try:
+            c.execute('SELECT COUNT(*) FROM sqlite_master').fetchone()
+            return False
+        except sqlite3.OperationalError as exc:
+            if 'readonly' not in str(exc).lower() and 'read-only' not in str(exc).lower():
+                raise
+        finally:
+            c.close()
+        if attempt < attempts - 1:
+            time.sleep(pause)
+    return True
 
 
 def recover(db):
     """Let SQLite roll back an interrupted transaction, exactly as any read-write open does. Returns integrity_check."""
-    c = sqlite3.connect(db, timeout=15)
+    c = sqlite3.connect(db, timeout=BUSY_TIMEOUT)
     try:
         return c.execute('PRAGMA integrity_check').fetchone()[0]
     finally:
@@ -311,7 +320,7 @@ def plan(db):
         return {'exists': False, 'current': 0, 'latest': LATEST, 'pending': LATEST, 'has_data': False, 'conflicts': []}
     if needs_recovery(db):
         return {'exists': True, 'needs_recovery': True, 'current': None, 'latest': LATEST, 'pending': None, 'has_data': True, 'conflicts': []}
-    c = sqlite3.connect(ro_uri(db), uri=True)
+    c = sqlite3.connect(ro_uri(db), uri=True, timeout=BUSY_TIMEOUT)
     try:
         current = c.execute('PRAGMA user_version').fetchone()[0]
         if current < 0:
@@ -324,10 +333,22 @@ def plan(db):
         c.close()
 
 
+def claim(path):
+    """Create `path` empty with mode 0600 and return it. If the name is taken, use the first free `name-2`, `name-3`...
+    Backups and kept files are named to the second; two in the same second must never overwrite each other."""
+    path = Path(path)
+    for n in itertools.count(1):
+        candidate = path if n == 1 else path.with_name(f'{path.stem}-{n}{path.suffix}')
+        try:
+            os.close(os.open(candidate, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600))
+            return candidate
+        except FileExistsError:
+            continue
+
+
 def _backup(c, db, version):
     stamp = dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    target = db.with_name(f'{db.stem}.backup-v{version}-{stamp}{db.suffix}')
-    os.close(os.open(target, os.O_CREAT | os.O_WRONLY, 0o600))
+    target = claim(db.with_name(f'{db.stem}.backup-v{version}-{stamp}{db.suffix}'))
     dest = sqlite3.connect(target)
     try:
         c.backup(dest)
@@ -350,7 +371,7 @@ def migrate(db):
         raise RuntimeError(f"Database schema v{state['current']} is newer than this Keystal OS (v{LATEST}). Refusing to open it.")
     if state['conflicts']:
         raise ConflictError(state['conflicts'])
-    c = sqlite3.connect(db, timeout=15, isolation_level=None)
+    c = sqlite3.connect(db, timeout=BUSY_TIMEOUT, isolation_level=None)
     try:
         current = c.execute('PRAGMA user_version').fetchone()[0]
         backup = None

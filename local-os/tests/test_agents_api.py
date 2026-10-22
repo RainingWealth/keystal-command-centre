@@ -1,7 +1,9 @@
 import json
 import sqlite3
 import sys
+import time
 import unittest
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -559,6 +561,45 @@ class ExistingFeaturesPreserved(ApiCase):
             self.assertTrue(list(d.glob('workbench.backup-v0-*.sqlite3')))
         finally:
             s.stop(); s.tmp.cleanup()
+
+
+class LocalDatabaseErrors(unittest.TestCase):
+    """A database the server cannot open is reported as that, never as 'server down' or as a successful read."""
+    def setUp(self):
+        self.s = Server().start()
+        self.addCleanup(self.s.tmp.cleanup)
+        self.addCleanup(self.s.stop)
+        self.c = self.s.client()
+        self.away = self.s.data.with_name('state-away')
+        self.addCleanup(lambda: self.away.exists() and self.away.rename(self.s.data))
+
+    def test_state_and_a_manual_refresh_report_the_database_error(self):
+        self.s.data.rename(self.away)
+        code, body, _ = self.c.request('/api/state')
+        self.assertEqual(code, 500)
+        self.assertIn('Local database or file error', body['error'])
+        code, body = self.c.post('/api/kanban/refresh', {})
+        self.assertEqual(code, 500)
+        self.assertIn('could not be recorded', body['error'])
+        self.away.rename(self.s.data)
+        self.assertEqual(self.c.request('/api/state')[0], 200)
+
+    def test_a_turn_whose_result_cannot_be_recorded_is_marked_interrupted_not_left_running(self):
+        (self.s.control / 'chat-delay').write_text('0.5')
+        code, run, _ = self.c.request('/api/chat', {'prompt': 'Synthetic prompt.', 'request_key': uuid.uuid4().hex})
+        self.assertEqual(code, 202)
+        self.s.data.rename(self.away)
+        for _ in range(100):
+            if (self.s.control / 'chat-done').exists():
+                break
+            time.sleep(.1)
+        time.sleep(1)  # the bridge now fails to record the reply, then fails to record the failure
+        self.away.rename(self.s.data)
+        state = self.c.state()
+        record = next(r for r in state['runs'] if r['id'] == run['run_id'])
+        self.assertEqual(record['status'], 'interrupted')
+        self.assertIn('without recording a result', record['error'])
+        self.assertEqual(self.c.request('/api/chat', {'prompt': 'Synthetic prompt two.', 'request_key': uuid.uuid4().hex})[0], 202, 'the bridge is free again')
 
 
 class StartupSafety(unittest.TestCase):

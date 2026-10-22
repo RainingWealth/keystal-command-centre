@@ -48,7 +48,7 @@ def open_ro(db):
     db = Path(db).resolve()
     if not db.is_file():
         raise SystemExit(f'No such database: {db}')
-    return sqlite3.connect(migrations.ro_uri(db), uri=True, timeout=15)
+    return sqlite3.connect(migrations.ro_uri(db), uri=True, timeout=migrations.BUSY_TIMEOUT)
 
 
 def qi(name):
@@ -172,7 +172,7 @@ def cmd_backup(args):
     out = Path(args.out) if args.out else Path(args.db).resolve().parent / 'backups'
     out.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(out, 0o700)
-    dest = out / f'{Path(args.db).stem}.backup-{stamp()}.sqlite3'
+    dest = migrations.claim(out / f'{Path(args.db).stem}.backup-{stamp()}.sqlite3')
     expected, version = online_backup(args.db, dest)
     verified, problems = verify_copy(dest, expected, version)
     return {'backup': str(dest), 'bytes': dest.stat().st_size, 'sha256': sha256(dest), 'mode': oct(dest.stat().st_mode & 0o777), 'verified': verified, 'problems': problems, 'method': 'sqlite online backup (read transaction held; live file not copied)'}, 3 if problems else 0
@@ -299,14 +299,14 @@ def cmd_quarantine(args):
         return report, 0
     out = Path(args.out) if args.out else db.resolve().parent / 'backups'
     out.mkdir(parents=True, exist_ok=True, mode=0o700)
-    backup_path = out / f'{db.stem}.pre-quarantine-{stamp()}.sqlite3'
+    backup_path = migrations.claim(out / f'{db.stem}.pre-quarantine-{stamp()}.sqlite3')
     expected, version = online_backup(db, backup_path)
     verified, problems = verify_copy(backup_path, expected, version)
     if problems:
         report['refused'] = ['backup verification failed; nothing was changed', problems]
         return report, 3
     saved = backup_path.with_suffix('.ddl.json')
-    c = sqlite3.connect(db, isolation_level=None, timeout=15)
+    c = sqlite3.connect(db, isolation_level=None, timeout=migrations.BUSY_TIMEOUT)
     try:
         c.execute('PRAGMA legacy_alter_table=OFF')
         c.execute('BEGIN IMMEDIATE')
@@ -390,6 +390,7 @@ def cmd_restore(args):
             return report, 3
         finally:
             c.close()
+        moved = migrations.claim(moved)  # an empty placeholder under a free name; the rename replaces only it
         db.rename(moved)
         for suffix in ('-journal', '-wal', '-shm'):
             side = Path(str(db) + suffix)
@@ -430,6 +431,9 @@ def main(argv=None):
     except NeedsRecovery as exc:
         report, code = {'database': str(exc), 'result': 'NEEDS RECOVERY: an interrupted transaction left a -journal file. This tool opens databases read-only and cannot roll it back. '
                         'Start the Keystal server once (it lets SQLite roll the transaction back, as any normal open does), then run this command again. Nothing was changed.'}, 3
+    except sqlite3.OperationalError as exc:
+        report, code = {'database': str(Path(getattr(args, 'db', None) or args.backup).resolve()),
+                        'result': f'STOPPED: SQLite reported "{exc}". Nothing further was done. If the server or another program is writing heavily, wait and run this command again.'}, 3
     print(json.dumps(report, indent=2))
     return code
 

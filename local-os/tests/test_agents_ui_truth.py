@@ -323,5 +323,17 @@ class FailedFirstRead(UiCase):
         self.assertNotIn('NOT CONNECTED', card)
 
 
+class DatabaseErrorUi(UiCase):
+    def test_a_database_error_is_shown_as_a_server_error_not_server_down(self):
+        away = self.server.data.with_name('state-away')
+        self.server.data.rename(away)
+        try:
+            self.page.locator('#server-status', has_text='Local server error').wait_for(timeout=15000)
+            self.assertIn('Local database or file error', self.page.locator('#server-status').inner_text())
+        finally:
+            away.rename(self.server.data)
+        self.page.locator('#server-status', has_text='connected').wait_for(timeout=15000)
+
+
 if __name__ == '__main__':
     unittest.main()

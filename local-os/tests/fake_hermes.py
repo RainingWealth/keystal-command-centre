@@ -60,7 +60,11 @@ if args[:1] == ['chat']:
     else:
         text = 'Stub reply.'
     store.write_text(json.dumps(sessions))
+    control = Path(os.environ.get('FAKE_HERMES_STATE', tempfile.gettempdir()))
+    if (control / 'chat-delay').exists():  # tests that need a turn in flight
+        time.sleep(float((control / 'chat-delay').read_text()))
     print(json.dumps({'type': 'result', 'text': text, 'session_id': sid, 'exit_code': 0}))
+    (control / 'chat-done').write_text(sid)
     sys.exit(0)
 
 sys.exit(2)

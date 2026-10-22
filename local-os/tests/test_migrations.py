@@ -3,6 +3,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -600,6 +601,23 @@ class ReviewFindings(unittest.TestCase):
         c = sqlite3.connect(db)
         self.assertEqual(c.execute('SELECT COUNT(*) FROM events').fetchone()[0], 0, 'the interrupted transaction was rolled back, not half-applied')
         c.close()
+
+    def test_a_writer_finishing_its_own_rollback_is_not_reported_as_needing_recovery(self):
+        db = self.root / 'w.sqlite3'
+        migrations.migrate(db)
+        interrupted_writer(db)
+        self.assertTrue(migrations.needs_recovery(db, attempts=1), 'hot right now')
+        owner = threading.Timer(0.05, migrations.recover, args=(db,))
+        owner.start()
+        try:
+            self.assertFalse(migrations.needs_recovery(db), 'hot for a moment, then rolled back by a live connection: nothing to recover')
+        finally:
+            owner.join()
+
+    def test_claimed_names_are_never_reused(self):
+        names = [migrations.claim(self.root / 'b.sqlite3') for _ in range(3)]
+        self.assertEqual([p.name for p in names], ['b.sqlite3', 'b-2.sqlite3', 'b-3.sqlite3'])
+        self.assertEqual({oct(p.stat().st_mode & 0o777) for p in names}, {'0o600'})
 
     def test_a_view_holding_a_table_name_is_a_conflict(self):
         db = self.root / 'v0.sqlite3'

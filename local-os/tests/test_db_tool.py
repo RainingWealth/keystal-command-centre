@@ -6,9 +6,9 @@ import os
 import sqlite3
 import sys
 import tempfile
-import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -98,30 +98,28 @@ class Backup(ToolCase):
 
     def test_backup_stays_consistent_while_another_process_writes(self):
         migrations.migrate(self.db)
-        stop = threading.Event()
-        written = []
-
-        def writer():
-            c = sqlite3.connect(self.db, timeout=30)
-            i = 0
-            while not stop.is_set():
-                c.execute('INSERT INTO events(kind,label,created) VALUES(?,?,?)', ('t', f'row {i}', 'n'))
-                c.commit()
-                written.append(i)
-                i += 1
-            c.close()
-
-        thread = threading.Thread(target=writer)
-        thread.start()
+        stop = self.dir / 'stop'
+        code = f"""import json,sqlite3,time,os
+c=sqlite3.connect({str(self.db)!r},timeout=30); n=0; error=None
+try:
+    while not os.path.exists({str(stop)!r}):
+        c.execute("INSERT INTO events(kind,label,created) VALUES('t',?,'n')",('row %d' % n,)); c.commit(); n+=1; time.sleep(0.002)
+except sqlite3.Error as e:
+    error='%s: %s (%s)' % (type(e).__name__, e, getattr(e,'sqlite_errorname',None))
+print(json.dumps({{'rows':n,'error':error}}))"""
+        import subprocess
+        writer = subprocess.Popen([sys.executable, '-c', code], stdout=subprocess.PIPE, text=True)
         try:
             for _ in range(5):
-                code, report = run('backup', '--db', str(self.db), '--out', str(self.dir / 'bk'))
-                self.assertEqual((code, report['problems']), (0, []), 'the backup matches the row counts seen when it started')
+                code_, report = run('backup', '--db', str(self.db), '--out', str(self.dir / 'bk'))
+                self.assertEqual((code_, report.get('problems')), (0, []), report)
                 self.assertEqual(report['verified']['integrity'], 'ok')
         finally:
-            stop.set()
-            thread.join()
-        self.assertGreater(len(written), 0, 'the writer really was running')
+            stop.touch()
+            result = json.loads(writer.communicate(timeout=60)[0])
+        self.assertIsNone(result['error'], 'the writer itself must not fail while backups run')
+        self.assertGreater(result['rows'], 0, 'the writer really was running')
+        self.assertEqual(len(list((self.dir / 'bk').iterdir())), 5, 'five backups, five files: none overwrote another')
 
     def test_a_corrupt_backup_is_caught_by_restore_test(self):
         pr_v2_db(self.db)
@@ -310,6 +308,36 @@ class ReviewFindings(ToolCase):
         self.assertIn('foreign key mismatch', report['invariants']['foreign_key_check_error'])
 
 
+class SameSecondAndBusy(ToolCase):
+    def test_backups_taken_in_the_same_second_are_separate_files(self):
+        legacy_db(self.db)
+        reports = []
+        with mock.patch.object(db_tool, 'stamp', return_value=db_tool.stamp()):
+            for _ in range(3):
+                c = sqlite3.connect(self.db)
+                c.execute("INSERT INTO events(kind,label,created) VALUES('x','y','n')")
+                c.commit(); c.close()
+                reports.append(run('backup', '--db', str(self.db), '--out', str(self.dir / 'bk'))[1])
+        self.assertEqual(len({r['backup'] for r in reports}), 3)
+        for r in reports:
+            self.assertEqual(db_tool.counts_at(r['backup']), r['verified']['rows'], 'each file still holds the backup its report describes')
+
+    def test_a_locked_database_is_reported_not_a_traceback(self):
+        legacy_db(self.db)
+        holder = sqlite3.connect(self.db, isolation_level=None)
+        holder.execute('BEGIN EXCLUSIVE')
+        try:
+            with mock.patch.object(migrations, 'BUSY_TIMEOUT', 0.2):
+                for cmd in (['inspect'], ['backup', '--out', str(self.dir / 'bk')], ['migrate-check']):
+                    code, report = run(*cmd, '--db', str(self.db))
+                    self.assertEqual(code, 3, cmd)
+                    self.assertIn('STOPPED', report['result'])
+                    self.assertIn('locked', report['result'])
+        finally:
+            holder.execute('ROLLBACK')
+            holder.close()
+
+
 class Restore(ToolCase):
     def setUp(self):
         super().setUp()
@@ -343,6 +371,17 @@ class Restore(ToolCase):
         self.assertEqual(dump(report['replaced_file_kept']), migrated, 'the replaced database is kept, not deleted')
         self.assertEqual(oct(self.db.stat().st_mode & 0o777), '0o600')
         self.assertEqual(migrations.plan(self.db)['current'], 2)
+
+    def test_a_kept_file_from_the_same_second_is_never_overwritten(self):
+        backup = self.backed_up_then_migrated()
+        frozen = db_tool.stamp()
+        earlier = self.db.with_name(f'{self.db.stem}.replaced-{frozen}{self.db.suffix}')
+        earlier.write_bytes(b'an earlier replaced database')
+        with mock.patch.object(db_tool, 'stamp', return_value=frozen):
+            code, report = run('restore', '--backup', str(backup), '--db', str(self.db), '--execute')
+        self.assertEqual((code, report['executed']), (0, True))
+        self.assertEqual(earlier.read_bytes(), b'an earlier replaced database')
+        self.assertEqual(migrations.plan(report['replaced_file_kept'])['current'], migrations.LATEST, 'the database just replaced is kept under a new name')
 
     def test_refuses_while_a_server_is_listening(self):
         import socket
