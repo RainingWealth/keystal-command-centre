@@ -26,13 +26,13 @@ Before `python3 local-os/server.py --migrate`:
 2. `python3 local-os/tools/diagnose_sqlite.py` has run on the Mac and its output has been reviewed.
 3. `db_tool.py backup` and `restore-test` pass on the production database, and a copy of that backup is stored off the Mac (an external drive).
 
-## Results recorded for code commit c893c49 (cloud sandbox, 22 October 2026)
+## Results recorded for code commit bc41c89 (cloud sandbox, 22 October 2026)
 
 This documentation commit changes no code. Self-contained suite, `python3 -m unittest discover -s local-os/tests`, with Playwright 1.56 and Chromium present, so the browser tests ran (none skipped):
 
 | File | Run | Passed | Failed | Errors | Skipped |
 | --- | --- | --- | --- | --- | --- |
-| test_agents_api | 52 | 52 | 0 | 0 | 0 |
+| test_agents_api | 53 | 53 | 0 | 0 | 0 |
 | test_agents_ui (browser) | 15 | 15 | 0 | 0 | 0 |
 | test_agents_ui_truth (browser) | 20 | 20 | 0 | 0 | 0 |
 | test_db_tool | 31 | 31 | 0 | 0 | 0 |
@@ -41,31 +41,36 @@ This documentation commit changes no code. Self-contained suite, `python3 -m uni
 | test_links_and_gate | 30 | 30 | 0 | 0 | 0 |
 | test_migrations | 43 | 43 | 0 | 0 | 0 |
 | test_tools | 6 | 6 | 0 | 0 | 0 |
-| **Total** | **243** | **243** | **0** | **0** | **0** |
+| **Total** | **244** | **244** | **0** | **0** | **0** |
 
-`verify.py`: 67 of 67 checks passed, against the **stub** Hermes CLI and a synthetic HOME. That is not a real-model result. The real-model result is the Mac run above, on b881114.
+`verify.py`: 67 of 67 checks passed at bc41c89, against the **stub** Hermes CLI and a synthetic HOME. That is not a real-model result. The real-model result is the Mac run above, on b881114.
 
-### Fixed in c893c49
+### Fixed since the Mac run (c893c49, bc41c89)
 
 The disk I/O investigation reviewed the code paths it touches and found real defects. Each fix has a test that fails on the previous code:
 
 - **Backups could overwrite each other.** Backups, migration backups, pre-quarantine backups and the database `restore` keeps aside were named to the second. A second one in the same second silently replaced the first; in the test, a restore overwrote an earlier kept database. Every such file is now created exclusively, with `-2`, `-3` and so on added if the name is taken.
 - **False "NEEDS RECOVERY".** A live connection rolling back its own transaction looks like a crashed writer for a moment. The check now answers yes only if the hot journal is still there after short retries.
 - **A busy database crashed `db_tool` with a traceback.** It now prints a JSON report that says the database was locked.
+- **Startup crashed with a traceback** when the database could not be opened (another program mid-write, or an unreadable journal). It now stops with a message and changes nothing.
+- **The hot-journal check now matches SQLite's exact error code** (SQLITE_READONLY_ROLLBACK) on Python 3.11 and later, instead of the message text. Other read-only errors are no longer mistaken for an interrupted transaction.
 - **A database error looked like "server unavailable".** The page now shows "Local server error" with the reason. A manual Kanban refresh that could not be recorded returns an error instead of the previous read as if it were new. A chat turn whose result could not be saved is marked interrupted instead of showing "working" forever.
 
 ## Independent review so far
 
 - **Requirements check, two passes.** Every gap that code can close is fixed and tested. What remains needs the Mac (the four steps above) or the other workspace's code.
 - **Code review, seven reviewers with one lens each.** Twice cut short by a usage limit. Two reviewers finished: migrations and database, and Kanban truthfulness. They reported 14 findings. Their verifiers did not run, so each finding was reproduced by hand before fixing. All 14 were real, and all are fixed with a test: path characters bypassing the `--migrate` gate, hot-journal and foreign-key crashes, views holding table names, quarantine re-parenting foreign rows, instance relabelling, unreadable timestamps, unrecorded refresh failures, and four wording problems.
-- **Mac failure investigation, three investigators each followed by a verifier.** Two investigators finished: macOS SQLite builds, and the disk I/O error. The defects they reported were confirmed by reading the code, and each has a test that fails on the previous code (listed above). The third investigator (trying to disprove the test-setup diagnosis) and all three verifiers were cut short by a usage limit; a re-run is in progress.
+- **Mac failure investigation: three investigators, each followed by a verifier.** All three investigators finished. Two verifiers were cut short by usage limits twice.
+  - **macOS SQLite builds** (verified): no published macOS SQLite build explains the missing spill. Python.org, Homebrew, uv and conda ship stock SQLite. Apple's current SQLite source is not public. 3.43.2 built with Apple's published options still spills in the sandbox, so the Mac's own `diagnose_sqlite.py` output is needed.
+  - **Trying to disprove the test-setup diagnosis:** it holds for every stock SQLite build with normal file locking. That covers 16 builds and option sets from 3.37.2 to 3.54.1, plus PERSIST and TRUNCATE journals and several sync levels. It also found the edge cases fixed below and the limits listed under Known limits.
+  - **The disk I/O error:** it does not reproduce in the sandbox. The defects found along the way are fixed (above).
 - **Not yet reviewed:** five reviewers did not run (security, front end, tools and docs, concurrency, approval and provenance). This release has not had an independent pass through those lenses.
 
 ## Evidence classes
 
 | Evidence | Class |
 | --- | --- |
-| The 243 tests above | **Simulated integration**: synthetic data, synthetic documents, stub Hermes CLI (`tests/fake_hermes.py`) |
+| The 244 tests above | **Simulated integration**: synthetic data, synthetic documents, stub Hermes CLI (`tests/fake_hermes.py`) |
 | `verify.py` in the cloud sandbox | **Simulated**: stub Hermes, no real model |
 | Real Hermes read, 31 records, board `default` | **Real**, on the Mac at b881114 |
 | Production database inspect and migration check | **Real**, on the Mac at b881114: no conflicts, every row kept |
@@ -101,6 +106,8 @@ The preview URL works only on the computer that runs it. A URL from the cloud sa
 - You can opt a task out of review and complete it without evidence. This is recorded and shown, and deliberately not blocked.
 - The loopback cookie bootstrap (visiting `/` grants API access) is a local safeguard, **not** remote-user authentication.
 - No ClickUp, Codex or Gemini adapter; ChatGPT, Claude, Codex and Gemini show NOT CONNECTED.
+- **Keep the data folder on the Mac's own disk** (APFS), not in Dropbox, iCloud Drive, a network share or a WebDAV mount. On those, SQLite's file locking can be absent or emulated. A crashed write can then go undetected, or recovery can roll back a live writer. `diagnose_sqlite.py` reports the data folder's filesystem.
+- **Power loss or a kernel panic:** SQLite's default on macOS does not force the journal to the physical disk before database pages (`PRAGMA fullfsync` is off). A sudden power cut could leave a damaged database that recovery cannot detect. The app has not changed this default. Turning it on would make each save slightly slower; the backups are the safeguard.
 
 ## Not part of this release
 
