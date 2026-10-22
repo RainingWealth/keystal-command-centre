@@ -4,7 +4,7 @@ Scope: one trustworthy **local** release. Loopback only, no deployment, no paid 
 
 ## Verdict
 
-**Not ready to activate against production yet.** Your Mac run on 21 October (commit b881114) passed every step it could run. Three tests failed, and the backup and restore test were not run:
+**Not ready to activate against production yet.** On your Mac run on 21 October (commit b881114), every step passed except the test suite (3 failures, a test-setup fault, since fixed). The backup and restore test were not run:
 
 | Step on the Mac | Result |
 | --- | --- |
@@ -25,6 +25,7 @@ Before `python3 local-os/server.py --migrate`:
 1. The test suite passes on the Mac at this commit: 0 failed, 0 skipped.
 2. `python3 local-os/tools/diagnose_sqlite.py` has run on the Mac and its output has been reviewed.
 3. `db_tool.py backup` and `restore-test` pass on the production database, and a copy of that backup is stored off the Mac (an external drive).
+4. The findings in [REVIEW_FINDINGS.md](REVIEW_FINDINGS.md) are fixed, the blocker first, each with a regression test.
 
 ## Results recorded for code commit bc41c89 (cloud sandbox, 22 October 2026)
 
@@ -58,13 +59,13 @@ The disk I/O investigation reviewed the code paths it touches and found real def
 
 ## Independent review so far
 
-- **Requirements check, two passes.** Every gap that code can close is fixed and tested. What remains needs the Mac (the four steps above) or the other workspace's code.
+- **Requirements check, two passes.** Every gap that code can close is fixed and tested. What remains needs the Mac (steps 1 to 3 above) or the other workspace's code.
 - **Code review, seven reviewers with one lens each.** Twice cut short by a usage limit. Two reviewers finished: migrations and database, and Kanban truthfulness. They reported 14 findings. Their verifiers did not run, so each finding was reproduced by hand before fixing. All 14 were real, and all are fixed with a test: path characters bypassing the `--migrate` gate, hot-journal and foreign-key crashes, views holding table names, quarantine re-parenting foreign rows, instance relabelling, unreadable timestamps, unrecorded refresh failures, and four wording problems.
 - **Mac failure investigation: three investigators, each followed by a verifier.** All three investigators finished. Two verifiers were cut short by usage limits twice.
   - **macOS SQLite builds** (verified): no published macOS SQLite build explains the missing spill. Python.org, Homebrew, uv and conda ship stock SQLite. Apple's current SQLite source is not public. 3.43.2 built with Apple's published options still spills in the sandbox, so the Mac's own `diagnose_sqlite.py` output is needed.
   - **Trying to disprove the test-setup diagnosis:** it holds for every stock SQLite build with normal file locking. That covers 16 builds and option sets from 3.37.2 to 3.54.1, plus PERSIST and TRUNCATE journals and several sync levels. It also found the edge cases fixed below and the limits listed under Known limits.
   - **The disk I/O error:** it does not reproduce in the sandbox. The defects found along the way are fixed (above).
-- **Not yet reviewed:** five reviewers did not run (security, front end, tools and docs, concurrency, approval and provenance). This release has not had an independent pass through those lenses.
+- **Five-lens review at c7ef6d5** (security, front end, tools and docs, concurrency, approval and provenance): each finding was reproduced by a separate verifier. 40 were confirmed (34 distinct after merging duplicates: 1 blocker, 10 major, 20 minor, 3 nit) and 1 refuted. **None is fixed yet.** [REVIEW_FINDINGS.md](REVIEW_FINDINGS.md) lists each with its scenario, evidence and suggested fix, plus the design decisions already made.
 
 ## Evidence classes
 
