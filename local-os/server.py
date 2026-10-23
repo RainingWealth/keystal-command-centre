@@ -21,6 +21,7 @@ from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
+import agent_events
 import agent_tasks
 import migrations
 from agent_tasks import ApiError
@@ -33,6 +34,9 @@ DB = DATA / 'workbench.sqlite3'
 PORT = int(os.environ.get('KEYSTAL_OS_PORT', '8766'))
 TOKEN = secrets.token_urlsafe(32)
 CSRF = secrets.token_urlsafe(32)
+WATCH_TOKEN_FILE = DATA / 'watch-token'  # bearer token for POST /api/watch/events only; never logged, returned or stored in the database
+WATCH_TOKEN = b''
+WATCH_MAX_BYTES = 4096
 HERMES = shutil.which(os.environ.get('KEYSTAL_OS_HERMES', 'hermes'))
 KANBAN_BOARD = os.environ.get('KEYSTAL_OS_KANBAN_BOARD', '').strip()
 HERMES_INSTANCE = os.environ.get('KEYSTAL_OS_HERMES_INSTANCE', 'local').strip()
@@ -76,6 +80,27 @@ def connect():
 def refuse(message):
     print(message, file=sys.stderr)
     sys.exit(2)
+
+def watch_token():
+    """The bearer token for /api/watch/events, created once (0600, in the data folder, outside the database)."""
+    try:
+        fd = os.open(WATCH_TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        fd = os.open(WATCH_TOKEN_FILE, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            os.fchmod(fd, 0o600)
+            token = os.read(fd, 256).strip()
+        finally:
+            os.close(fd)
+        if len(token) >= 32:
+            return token
+        refuse(f'{WATCH_TOKEN_FILE} is not a valid token file. Delete it and start again to create a new one. Nothing was changed.')
+    token = secrets.token_urlsafe(32).encode()
+    try:
+        os.write(fd, token + b'\n')
+    finally:
+        os.close(fd)
+    return token
 
 def startup_checks():
     """Fail at startup, never silently fall back: a wrong board or profile would be displayed as the selected one."""
@@ -309,6 +334,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, {**{k: state[k] for k in ('captures', 'threads', 'messages', 'events', 'server_time')}, **agent_data})
         return self.send(404, {'error': 'Not found'})
     def do_POST(self):
+        if urlsplit(self.path).path == '/api/watch/events':
+            return self.watch_event()
         if not self.validhost() or not self.authorised():
             return self.send(403, {'error': 'Access rejected'})
         if self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}', f'http://localhost:{PORT}') or not secrets.compare_digest(self.headers.get('X-Keystal-CSRF', ''), CSRF):
@@ -330,6 +357,39 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             traceback.print_exc()
             return self.send(500, {'error': 'Local operation failed. No external update claimed.'})
+    def watch_event(self):
+        """Local AI tooling reports activity metadata. Dedicated bearer token only: the browser cookie and CSRF token
+        never authenticate here, and a request carrying an Origin (any browser page) is refused, so no CORS is offered."""
+        if not self.validhost() or self.headers.get('Origin') is not None:
+            return self.send(403, {'error': 'Access rejected'})
+        scheme, _, presented = self.headers.get('Authorization', '').partition(' ')
+        if not WATCH_TOKEN or scheme.lower() != 'bearer' or not secrets.compare_digest(presented.strip().encode(), WATCH_TOKEN):
+            self.close_connection = True
+            return self.send(401, {'error': 'Bearer token required'})
+        if self.headers.get('Content-Type', '').split(';')[0].strip() != 'application/json':
+            return self.send(415, {'error': 'JSON required'})
+        try:
+            size = int(self.headers.get('Content-Length', '-1'))
+        except ValueError:
+            size = -1
+        if size < 2 or size > WATCH_MAX_BYTES:
+            self.close_connection = True
+            return self.send(413, {'error': f'Body must be 2 to {WATCH_MAX_BYTES} bytes with a Content-Length'})
+        try:
+            data = json.loads(self.rfile.read(size))
+            if not isinstance(data, dict):
+                raise BadRequest('Object required')
+            with connect() as c:
+                c.isolation_level = None
+                code, payload = agent_events.record(c, now(), data)
+            return self.send(code, payload)
+        except ApiError as exc:
+            return self.send(exc.status, {'error': str(exc)})
+        except ValueError:
+            return self.send(400, {'error': 'Invalid JSON'})
+        except Exception:
+            traceback.print_exc()
+            return self.send(500, {'error': 'Local operation failed. The event was not stored.'})
     def post(self, path, data):
         if path in agent_tasks.ROUTES:
             with connect() as c:
@@ -431,6 +491,7 @@ if __name__ == '__main__':
     parser.add_argument('--migrate', action='store_true', help='apply pending database migrations to an existing database (a backup is taken first)')
     args = parser.parse_args()
     startup_checks()
+    WATCH_TOKEN = watch_token()
     lock_path = DATA / 'keystal-server.lock'
     lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
     os.chmod(lock_path, 0o600)
