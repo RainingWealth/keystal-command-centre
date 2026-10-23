@@ -148,6 +148,32 @@ MIGRATIONS = [
         "CREATE TRIGGER agent_task_sessions_no_replace BEFORE INSERT ON agent_task_sessions WHEN EXISTS(SELECT 1 FROM agent_task_sessions WHERE id=NEW.id) OR EXISTS(SELECT 1 FROM agent_task_sessions WHERE task_id=NEW.task_id AND agent_id=NEW.agent_id AND session_ref=NEW.session_ref AND run_ref=NEW.run_ref) BEGIN SELECT RAISE(ABORT,'session records are append-only'); END",
         "CREATE TRIGGER external_refs_no_replace BEFORE INSERT ON external_refs WHEN EXISTS(SELECT 1 FROM external_refs WHERE id=NEW.id) OR EXISTS(SELECT 1 FROM external_refs WHERE provider=NEW.provider AND instance=NEW.instance AND scope=NEW.scope AND external_id=NEW.external_id) BEGIN SELECT RAISE(ABORT,'a link cannot be edited; unlink and link again'); END",
     ]),
+    ('append-only agent activity events (storage only: no endpoint, no hooks)', [
+        # One row per lifecycle event an agent's own tooling reports (Claude Code, Codex, Gemini CLI) or this server
+        # observes (Hermes). Metadata only: never prompts, transcripts, tool arguments or results. An event never
+        # changes a tracked task: 'Stop' ends a response, not a task. Events join agent_task_sessions on
+        # (agent_id, session_ref); there is deliberately no foreign key to a task.
+        # event_key is the sender's own unique id for the event, so a retried delivery is recognised as the same event.
+        f"""CREATE TABLE agent_events(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_key TEXT NOT NULL UNIQUE CHECK(length(event_key) BETWEEN 16 AND 80 AND event_key NOT GLOB '*[^A-Za-z0-9_-]*'),
+            agent_id TEXT NOT NULL REFERENCES agents(id),
+            session_ref TEXT NOT NULL CHECK(length(session_ref) BETWEEN 1 AND 128 AND session_ref NOT GLOB '*[^A-Za-z0-9._:-]*'),
+            run_ref TEXT NOT NULL DEFAULT '' CHECK(length(run_ref) <= 128 AND run_ref NOT GLOB '*[^A-Za-z0-9._:-]*'),
+            event_type TEXT NOT NULL CHECK(event_type IN ('SessionStart','PostToolUse','Stop','SessionEnd')),
+            occurred_at TEXT NOT NULL CHECK(length(occurred_at) BETWEEN 19 AND 35 AND occurred_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][T ][0-9][0-9]:[0-9][0-9]:[0-9][0-9]*' AND julianday(occurred_at) IS NOT NULL),
+            received_at TEXT NOT NULL CHECK(length(received_at) BETWEEN 19 AND 35 AND received_at GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9][T ][0-9][0-9]:[0-9][0-9]:[0-9][0-9]*' AND julianday(received_at) IS NOT NULL),
+            source TEXT NOT NULL CHECK(source IN ('observed','hook_reported')))""",
+        "CREATE INDEX agent_events_agent_recent ON agent_events(agent_id,occurred_at)",
+        "CREATE INDEX agent_events_session ON agent_events(agent_id,session_ref,occurred_at)",
+        "CREATE TRIGGER agent_events_no_update BEFORE UPDATE ON agent_events BEGIN SELECT RAISE(ABORT,'agent events are append-only'); END",
+        "CREATE TRIGGER agent_events_no_delete BEFORE DELETE ON agent_events BEGIN SELECT RAISE(ABORT,'agent events are append-only'); END",
+        # REPLACE deletes without firing delete triggers (recursive_triggers is off), so inserts guard themselves:
+        # a re-delivered event_key is silently ignored (first delivery wins, nothing is overwritten; rowcount 0 tells
+        # the caller it was a duplicate), and reusing a row id is refused.
+        "CREATE TRIGGER agent_events_duplicate_ignored BEFORE INSERT ON agent_events WHEN EXISTS(SELECT 1 FROM agent_events WHERE event_key=NEW.event_key) BEGIN SELECT RAISE(IGNORE); END",
+        "CREATE TRIGGER agent_events_no_replace BEFORE INSERT ON agent_events WHEN EXISTS(SELECT 1 FROM agent_events WHERE id=NEW.id) BEGIN SELECT RAISE(ABORT,'agent events are append-only'); END",
+    ]),
 ]
 LATEST = len(MIGRATIONS)
 

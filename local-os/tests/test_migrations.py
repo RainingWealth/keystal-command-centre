@@ -34,6 +34,7 @@ FROZEN_HASHES = {  # SHA-256 of each shipped migration's statements as they are 
     2: '033e4ba47f06179cdd65aacb1b6f2bdcefdb00157f33f2a852853ba3d963db3f',
     3: 'ebdd765f61fd42149df5323b8224e5da1cb598d7b3ede984d13151a4a3814b6f',  # as pushed in b9bd4c3
     4: '268aaeaf148f22993e338d48dbdc3aefffbdfc12bc8e44e60494bb3240a34880',
+    5: '29e9db76e13001bd2042c22c29d62d0f077156e103336488f2cfbc5833d22256',  # as shipped at 15c0e60 (Milestone A)
 }
 
 

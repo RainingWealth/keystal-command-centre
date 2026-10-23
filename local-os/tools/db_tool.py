@@ -359,7 +359,8 @@ SCHEMA_CODE = {0: 'the original app (main 3735b38) opens it as is; this branch o
                2: 'PR #1 head e0aea41 opens it as is; this branch opens it only after --migrate',
                3: 'the corrective-pass commits a1589e1 to b9bd4c3 open it as is; current code opens it only after --migrate',
                4: 'this branch up to c7ef6d5; migrate before opening',
-               5: 'the current code'}
+               5: 'this branch up to 15c0e60 (Milestone A); migrate before opening',
+               6: 'the current code (agent event storage)'}
 
 
 def server_listening():
