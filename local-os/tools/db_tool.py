@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Keystal OS database tool. Safe by construction: every command that reads a database opens it
-read-only; backups use SQLite's online backup API (never a raw file copy of a live database);
-nothing here modifies a database except `quarantine --execute`, which backs up first.
+"""Keystal OS database tool. Safe by construction: inspection commands open databases read-only;
+restore --execute opens the live database read-write; backups use SQLite's online backup API (never a raw file copy of a live database);
+nothing here modifies a database except `quarantine --execute` and `restore --execute`, which verify and back up first.
 
   inspect        schema, row COUNTS only (no content), integrity, classification, pending migrations
   backup         consistent online backup to a new 0600 file, verified (integrity + row counts)
@@ -25,6 +25,7 @@ import socket
 import sqlite3
 import sys
 import tempfile
+import fcntl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import migrations  # noqa: E402
@@ -171,9 +172,12 @@ def verify_copy(path, expected_counts, expected_version):
 def cmd_backup(args):
     out = Path(args.out) if args.out else Path(args.db).resolve().parent / 'backups'
     out.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(out, 0o700)
     dest = migrations.claim(out / f'{Path(args.db).stem}.backup-{stamp()}.sqlite3')
-    expected, version = online_backup(args.db, dest)
+    try:
+        expected, version = online_backup(args.db, dest)
+    except BaseException:
+        dest.unlink(missing_ok=True)
+        raise
     verified, problems = verify_copy(dest, expected, version)
     return {'backup': str(dest), 'bytes': dest.stat().st_size, 'sha256': sha256(dest), 'mode': oct(dest.stat().st_mode & 0o777), 'verified': verified, 'problems': problems, 'method': 'sqlite online backup (read transaction held; live file not copied)'}, 3 if problems else 0
 
@@ -185,6 +189,8 @@ def cmd_restore_test(args):
         restored = scratch / 'restored.sqlite3'
         expected, version = online_backup(args.backup, restored)
         verified, problems = verify_copy(restored, expected, version)
+        if not expected or not (set(expected) & {'captures','threads','messages','runs','events','meta','agents','agent_tasks','projects'}):
+            problems.append('backup has no tables')
         plan = migrations.plan(restored)
         report = {'backup': str(Path(args.backup).resolve()), 'restored_into_scratch': True, 'verified': verified, 'problems': problems,
                   'classification': classify_at(restored, plan), 'pending_migrations': plan['pending'], 'conflicts': plan['conflicts']}
@@ -213,6 +219,8 @@ def cmd_restore_test(args):
 
 
 def cmd_migrate_check(args):
+    if not Path(args.db).is_file():
+        return {'database': str(Path(args.db).resolve()), 'result': 'No such database; nothing was changed.'}, 3
     scratch = Path(tempfile.mkdtemp(prefix='keystal-migrate-check-'))
     os.chmod(scratch, 0o700)
     try:
@@ -260,6 +268,8 @@ def _referencing_sql(c, names, skip_tables):
 
 def cmd_quarantine(args):
     db = Path(args.db)
+    if not db.is_file():
+        return {'database': str(db.resolve()), 'result': 'No such database; nothing was changed.', 'executed': False}, 3
     plan = migrations.plan(db)
     if not plan['conflicts']:
         return {'database': str(db.resolve()), 'result': 'Nothing to quarantine: no schema conflict.', 'executed': False}, 0
@@ -297,6 +307,10 @@ def cmd_quarantine(args):
     if not args.execute:
         report['result'] = 'Dry run. Re-run with --execute to apply (a verified backup is taken first).'
         return report, 0
+    lock_fd = data_lock(db)
+    if lock_fd is None:
+        report['refused'] = 'Another Keystal OS server is already using this data folder. Nothing was changed.'
+        return report, 3
     out = Path(args.out) if args.out else db.resolve().parent / 'backups'
     out.mkdir(parents=True, exist_ok=True, mode=0o700)
     backup_path = migrations.claim(out / f'{db.stem}.pre-quarantine-{stamp()}.sqlite3')
@@ -304,6 +318,7 @@ def cmd_quarantine(args):
     verified, problems = verify_copy(backup_path, expected, version)
     if problems:
         report['refused'] = ['backup verification failed; nothing was changed', problems]
+        os.close(lock_fd)
         return report, 3
     saved = backup_path.with_suffix('.ddl.json')
     c = sqlite3.connect(db, isolation_level=None, timeout=migrations.BUSY_TIMEOUT)
@@ -336,13 +351,15 @@ def cmd_quarantine(args):
     after = migrations.plan(db)
     report.update(executed=True, backup=str(backup_path), backup_verified=verified, saved_definitions=str(saved), conflicts_remaining=after['conflicts'],
                   result='Quarantined. Run migrate-check, then start the server with --migrate.' if not after['conflicts'] else 'Quarantined the foreign tables, but conflicts remain (listed). Do not migrate yet.')
+    os.close(lock_fd)
     return report, 3 if after['conflicts'] else 0
 
 
 SCHEMA_CODE = {0: 'the original app (main 3735b38) opens it as is; this branch opens it only after --migrate',
                2: 'PR #1 head e0aea41 opens it as is; this branch opens it only after --migrate',
                3: 'the corrective-pass commits a1589e1 to b9bd4c3 open it as is; current code opens it only after --migrate',
-               4: 'current code (with edit revisions) opens it as is; no older version can'}
+               4: 'this branch up to c7ef6d5; migrate before opening',
+               5: 'the current code'}
 
 
 def server_listening():
@@ -351,18 +368,31 @@ def server_listening():
         s.settimeout(0.5)
         return port if s.connect_ex(('127.0.0.1', port)) == 0 else None
 
+def data_lock(db):
+    fd = os.open(Path(db).resolve().parent / 'keystal-server.lock', os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        return None
+    return fd
+
 
 def cmd_restore(args):
     """Roll back: replace the live database with a backup. Verifies the backup first, keeps the replaced file."""
     db, backup = Path(args.db).resolve(), Path(args.backup).resolve()
     if not backup.is_file():
-        raise SystemExit(f'No such backup: {backup}')
+        return {'database': str(db), 'backup': str(backup), 'problems': ['backup does not exist'], 'result': 'No such backup; nothing was changed.', 'executed': False}, 3
+    if db == backup or os.path.samefile(db, backup):
+        return {'database': str(db), 'backup': str(backup), 'problems': ['backup and database are the same file'], 'refused': 'Backup and database are the same file.', 'executed': False}, 3
     scratch = Path(tempfile.mkdtemp(prefix='keystal-restore-'))
     os.chmod(scratch, 0o700)
     try:
         check = scratch / 'check.sqlite3'
         expected, version = online_backup(backup, check)
         verified, problems = verify_copy(check, expected, version)
+    if not expected or not (set(expected) & {'captures','threads','messages','runs','events','meta','agents','agent_tasks','projects'}):
+            problems.append('backup is empty or not a Keystal database')
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
     stamp_ = stamp()
@@ -372,11 +402,18 @@ def cmd_restore(args):
               'would_rename_current_to': str(moved) if db.exists() else None, 'executed': False}
     if problems:
         report['refused'] = 'The backup failed verification; nothing was changed.'
+        report['executed'] = False
         return report, 3
     port = server_listening()
     if port:
         report['refused'] = f'Something is listening on 127.0.0.1:{port}. Stop the Keystal server first (Ctrl+C), then run this again. Nothing was changed.'
         return report, 3
+    lock_fd = None
+    if args.execute:
+        lock_fd = data_lock(db)
+        if lock_fd is None:
+            report['refused'] = 'Another Keystal OS server is already using this data folder. Nothing was changed.'
+            return report, 3
     if not args.execute:
         report['result'] = 'Dry run. Stop the server, then re-run with --execute. The current database is renamed (kept), never deleted.'
         return report, 0
@@ -396,10 +433,18 @@ def cmd_restore(args):
             side = Path(str(db) + suffix)
             if side.exists():
                 side.rename(Path(str(moved) + suffix))
-    expected, version = online_backup(backup, db)
+    try:
+        expected, version = online_backup(backup, db)
+    except sqlite3.DatabaseError as exc:
+        if not db.exists() and moved.exists():
+            moved.rename(db)
+        report.update(refused=f'Restore failed before installation: {exc}; the live database was kept.', result='Nothing was changed.')
+        if lock_fd is not None: os.close(lock_fd)
+        return report, 3
     verified, problems = verify_copy(db, expected, version)
     report.update(executed=True, restored_rows=verified['rows'], problems=problems, replaced_file_kept=str(moved) if moved.exists() else None,
                   result='Restored. Start the code version listed above.' if not problems else 'Restored file failed verification: the replaced file is kept; put it back by renaming.')
+    if lock_fd is not None: os.close(lock_fd)
     return report, 3 if problems else 0
 
 
@@ -428,10 +473,12 @@ def main(argv=None):
             if path and Path(path).is_file() and migrations.needs_recovery(path):
                 raise NeedsRecovery(str(Path(path).resolve()))
         report, code = {'inspect': cmd_inspect, 'backup': cmd_backup, 'restore-test': cmd_restore_test, 'migrate-check': cmd_migrate_check, 'quarantine': cmd_quarantine, 'restore': cmd_restore}[args.cmd](args)
+    except SystemExit as exc:
+        report, code = {'database': str(Path(getattr(args, 'db', None) or getattr(args, 'backup', '')).resolve()), 'result': str(exc)}, 3
     except NeedsRecovery as exc:
         report, code = {'database': str(exc), 'result': 'NEEDS RECOVERY: an interrupted transaction left a -journal file. This tool opens databases read-only and cannot roll it back. '
                         'Start the Keystal server once (it lets SQLite roll the transaction back, as any normal open does), then run this command again. Nothing was changed.'}, 3
-    except sqlite3.OperationalError as exc:
+    except sqlite3.DatabaseError as exc:
         report, code = {'database': str(Path(getattr(args, 'db', None) or args.backup).resolve()),
                         'result': f'STOPPED: SQLite reported "{exc}". Nothing further was done. If the server or another program is writing heavily, wait and run this command again.'}, 3
     print(json.dumps(report, indent=2))

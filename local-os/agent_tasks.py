@@ -19,7 +19,7 @@ import re
 import sqlite3
 import subprocess
 import uuid
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, unquote
 
 STATUSES = ('queued', 'running', 'awaiting_review', 'blocked', 'failed', 'paused', 'completed', 'stale')
 STATUS_LABELS = {'queued': 'Queued', 'running': 'Running', 'awaiting_review': 'Awaiting review', 'blocked': 'Blocked', 'failed': 'Failed', 'paused': 'Paused', 'completed': 'Completed', 'stale': 'Stale'}
@@ -95,6 +95,10 @@ def field(data, key, maximum, default='', required=False):
     if not isinstance(value, str):
         raise ApiError('Invalid ' + key)
     value = value.strip()
+    if SENSITIVE.search(unquote(value)):
+        raise ApiError('Remove personal identification numbers. Use [CLIENT].')
+    if SENSITIVE.search(value):
+        raise ApiError('Remove personal identification numbers. Use [CLIENT].')
     if len(value) > maximum:
         raise ApiError(f'{key} is too long (max {maximum} characters)')
     if required and not value:
@@ -136,6 +140,8 @@ def evidence_url(value):
     if not isinstance(value, str) or len(value.strip()) > 500:
         raise ApiError('Invalid evidence link')
     value = value.strip()
+    if SENSITIVE.search(value):
+        raise ApiError('Remove personal identification numbers. Use [CLIENT].')
     parts = urlsplit(value)
     if parts.scheme not in ('http', 'https') or not parts.hostname or '@' in parts.netloc or re.search(r'[\s\x00-\x1f\x7f<>"\']', value):
         raise ApiError('Evidence link must be a plain http(s) URL without credentials')

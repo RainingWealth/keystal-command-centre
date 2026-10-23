@@ -139,6 +139,15 @@ MIGRATIONS = [
         # refused with 409 instead of silently winning. recursive_triggers is off, so the inner UPDATE does not loop.
         "CREATE TRIGGER agent_tasks_revision AFTER UPDATE ON agent_tasks WHEN NEW.revision = OLD.revision BEGIN UPDATE agent_tasks SET revision = OLD.revision + 1 WHERE id = NEW.id; END",
     ]),
+    ('approval and provenance hardening', [
+        "CREATE TRIGGER agent_tasks_v5_completion BEFORE UPDATE ON agent_tasks WHEN OLD.requires_review=1 AND OLD.status!='completed' AND NEW.status='completed' AND (NEW.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=NEW.id)) BEGIN SELECT RAISE(ABORT,'completion needs an approved review with evidence'); END",
+        "CREATE TRIGGER agent_tasks_v5_review_off BEFORE UPDATE ON agent_tasks WHEN OLD.requires_review=1 AND NEW.requires_review=0 AND (OLD.status IN ('awaiting_review','completed') OR NEW.status='completed') BEGIN SELECT RAISE(ABORT,'cannot turn review off during or after review'); END",
+        "CREATE TRIGGER agent_tasks_v5_approval BEFORE UPDATE ON agent_tasks WHEN NEW.review_state='approved' AND OLD.review_state!='approved' AND ((NEW.status='completed' AND (OLD.status!='awaiting_review' OR OLD.review_state!='pending' OR NEW.status_source!='manual')) OR (NEW.status!='completed' AND OLD.status='awaiting_review' AND (OLD.review_state!='pending' OR NEW.status_source!='manual'))) BEGIN SELECT RAISE(ABORT,'approval requires a pending manual review'); END",
+        "CREATE TRIGGER agent_task_history_no_replace BEFORE INSERT ON agent_task_history WHEN EXISTS(SELECT 1 FROM agent_task_history WHERE id=NEW.id) BEGIN SELECT RAISE(ABORT,'history is append-only'); END",
+        "CREATE TRIGGER agent_task_evidence_no_replace BEFORE INSERT ON agent_task_evidence WHEN EXISTS(SELECT 1 FROM agent_task_evidence WHERE id=NEW.id) BEGIN SELECT RAISE(ABORT,'evidence is append-only'); END",
+        "CREATE TRIGGER agent_task_sessions_no_replace BEFORE INSERT ON agent_task_sessions WHEN EXISTS(SELECT 1 FROM agent_task_sessions WHERE id=NEW.id) OR EXISTS(SELECT 1 FROM agent_task_sessions WHERE task_id=NEW.task_id AND agent_id=NEW.agent_id AND session_ref=NEW.session_ref AND run_ref=NEW.run_ref) BEGIN SELECT RAISE(ABORT,'session records are append-only'); END",
+        "CREATE TRIGGER external_refs_no_replace BEFORE INSERT ON external_refs WHEN EXISTS(SELECT 1 FROM external_refs WHERE id=NEW.id) OR EXISTS(SELECT 1 FROM external_refs WHERE provider=NEW.provider AND instance=NEW.instance AND scope=NEW.scope AND external_id=NEW.external_id) BEGIN SELECT RAISE(ABORT,'a link cannot be edited; unlink and link again'); END",
+    ]),
 ]
 LATEST = len(MIGRATIONS)
 
@@ -264,7 +273,7 @@ def invariants(c):
     tables = _user_tables(c)
     out = {}
     if 'agent_tasks' in tables and 'agent_task_evidence' in tables:
-        out['completed_without_approval_and_evidence'] = c.execute("""SELECT COUNT(*) FROM agent_tasks t WHERE t.status='completed' AND t.requires_review=1
+        out['completed_without_approval_and_evidence'] = c.execute("""SELECT COUNT(*) FROM agent_tasks t WHERE t.status='completed' AND (t.requires_review=1 OR t.review_state='pending')
             AND (t.review_state!='approved' OR NOT EXISTS(SELECT 1 FROM agent_task_evidence e WHERE e.task_id=t.id))""").fetchone()[0]
     try:
         out['foreign_key_violations'] = len(c.execute('PRAGMA foreign_key_check').fetchall())
@@ -383,6 +392,13 @@ def migrate(db):
         for version in range(current + 1, LATEST + 1):
             c.execute('BEGIN IMMEDIATE')
             try:
+                locked_current = c.execute('PRAGMA user_version').fetchone()[0]
+                if locked_current >= version:
+                    c.execute('COMMIT')
+                    continue
+                if locked_current != version - 1:
+                    c.execute('ROLLBACK')
+                    raise RuntimeError(f'concurrent migration advanced database to v{locked_current}')
                 for statement in MIGRATIONS[version - 1][1]:
                     c.execute(statement)
                 c.execute(f'PRAGMA user_version={version}')

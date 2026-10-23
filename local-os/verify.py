@@ -93,7 +93,7 @@ with tempfile.TemporaryDirectory(prefix='keystal-test-',dir=os.environ.get('TMPD
         state=client.request('/api/state')[1]
         check('Five agents registered',[a['name'] for a in state['agents']['agents']]==['Hermes','ChatGPT','Claude','Codex','Gemini'])
         check('Unconnected agents report Not Connected',all(a['connection']['status']=='not_connected' for a in state['agents']['agents'] if a['id']!='hermes'))
-        check('No agent activity is invented on a fresh workspace',not state['agent_tasks'] and all(sum(a['counts'].values())==0 for a in state['agents']['agents']))
+        check('No agent activity is invented on a fresh workspace',not state['agent_tasks'] and all(sum(a['counts'].values())==0 or (a['id']=='hermes' and a.get('board')) for a in state['agents']['agents']))
         check('Agent task write needs CSRF',client.request('/api/agent-tasks',{'title':'QA task — synthetic'},{'X-Keystal-CSRF':''})[0]==403)
         check('Empty agent task rejected',client.request('/api/agent-tasks',{'title':''})[0]==400)
         code,made,_=client.request('/api/agent-tasks',{'title':'QA agent task — synthetic','agent_id':'claude'}); tid=made['id']

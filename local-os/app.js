@@ -2,16 +2,26 @@
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 let state = null, openTaskId = '', openTaskRevision = null, currentThread = localStorage.getItem('keystal.thread') || '', lastMessages = '', pendingRequest = null, pollBusy = false, toastTimer;
+let lastPollAt = 0, clientStale = false;
 const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const dateLabel = (s) => s ? new Date(s).toLocaleString('en-SG', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Not checked';
 function toast(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').hidden = true, 5000); }
 async function api(path, body) {
-  const options = {credentials:'same-origin', cache:'no-store'};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), body === undefined ? 10000 : 330000);
+  const options = {credentials:'same-origin', cache:'no-store', signal:controller.signal};
   if (body !== undefined) Object.assign(options, {method:'POST', headers:{'Content-Type':'application/json','X-Keystal-CSRF':state?.csrf || ''}, body:JSON.stringify(body)});
-  const response = await fetch(path, options);
-  const result = await response.json();
-  if (!response.ok) throw Object.assign(new Error(result.error || 'Request failed'), {status: response.status});
-  return result;
+  try {
+    let response = await fetch(path, options);
+    // A restart invalidates the cookie. Re-bootstrap only this read; never replay a write.
+    if (response.status === 401 && path === '/api/state' && body === undefined) {
+      await fetch('/', options);
+      response = await fetch(path, options);
+    }
+    const result = await response.json();
+    if (!response.ok) throw Object.assign(new Error(result.error || 'Request failed'), {status: response.status});
+    return result;
+  } finally { clearTimeout(timer); }
 }
 function setView(view) {
   if (!$(`[data-page="${view}"]`)) view = 'today';
@@ -61,7 +71,7 @@ function renderConnections() {
   const vault = state.checks.dropbox;
   const row = (title, detail, status, style, button = '') => `<div class="connection-row"><div><strong>${title}</strong><p>${escapeHTML(detail)}</p><span class="badge ${style}">${escapeHTML(status)}</span></div>${button}</div>`;
   $('#connection-list').innerHTML =
-    row('Local workspace', 'Captures, conversations and activity are stored in SQLite on this Mac. No external task updates.', 'RUNNING LOCALLY', 'good') +
+    row('Local workspace', 'Captures, conversations and activity are stored in SQLite on this Mac. No external task updates.', clientStale ? 'NOT UPDATED · CACHED DATA' : 'RUNNING LOCALLY', clientStale ? 'failed' : 'good') +
     row('Hermes / Keystal', chat ? `${chat.detail} Checked ${dateLabel(chat.checked_at)}.` : 'CLI detected; a completed turn is required to verify model access.', chat ? chat.status.toUpperCase() : 'NOT YET TESTED IN THIS APP', chat?.status === 'verified' ? 'good' : 'pending', '<button class="button outline" data-chat-test="true">Test real reply ↗</button>') +
     row('Dropbox / Obsidian', vault ? `${vault.detail} Checked ${dateLabel(vault.checked_at)}.` : 'Existing Mac connector available for a read-only test. Saved OS documents are separate from a live check.', vault ? vault.status.toUpperCase() : 'LIVE READ UNCHECKED', vault?.status === 'verified' ? 'good' : 'pending', '<button class="button outline" id="check-dropbox">Check live read ↗</button>') +
     row('ClickUp', 'Owns business commitments. This OS has no ClickUp adapter: tasks here can carry a ClickUp reference, but nothing is read from or written to ClickUp, and local captures are not ClickUp tasks.', 'NOT CONNECTED IN THIS OS', 'pending', '<a class="button outline" href="https://app.clickup.com/" target="_blank" rel="noopener noreferrer">Open ClickUp ↗</a>') +
@@ -72,6 +82,7 @@ function renderConnections() {
     row('Cloud hosting', 'No hosting selected. This local URL is not reachable from your phone or another computer.', 'NOT DEPLOYED', 'pending');
 }
 function kanbanBadge(k) {
+  if (clientStale) return ['NOT UPDATED · CACHED DATA', 'failed'];
   if (k.status === 'connected') return k.stale ? ['CONNECTED · DATA STALE', 'failed'] : ['CONNECTED · READ-ONLY', 'good'];
   return ({not_connected:['NOT CONNECTED', 'pending'], failed:['READ FAILED', 'failed'], unchecked:['NOT READ YET', 'pending']})[k.status] || [String(k.status).toUpperCase(), 'pending'];
 }
@@ -90,11 +101,11 @@ const STATUS = {queued:'Queued', running:'Running', awaiting_review:'Awaiting re
 const SOURCE = {observed:'OBSERVED', manual:'MANUAL', agent_reported:'AGENT-REPORTED'};
 const SOURCE_HINT = {observed:'Read directly by this OS', manual:'Typed in by you', agent_reported:'Relayed from the agent; not verified by this OS'};
 const REVIEW = {pending:'REVIEW PENDING', approved:'APPROVED BY YOU', rejected:'REJECTED · REWORK'};
-const ago = (s) => { if (!s) return 'never'; const m = Math.max(0, Math.round((Date.now() - new Date(s)) / 60000)); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
+const ago = (s) => { if (!s) return 'never'; if (clientStale) return dateLabel(s); const m = Math.max(0, Math.round((Date.now() - new Date(s)) / 60000)); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
 const srcBadge = (source) => `<span class="src src-${escapeHTML(source)}" title="${escapeHTML(SOURCE_HINT[source] || '')}">${escapeHTML(SOURCE[source] || source)}</span>`;
 const statusBadge = (status) => `<span class="badge st-${escapeHTML(status)}">${escapeHTML((STATUS[status] || status).toUpperCase())}</span>`;
 const options = (pairs, selected) => pairs.map(([v, l]) => `<option value="${escapeHTML(v)}" ${v === selected ? 'selected' : ''}>${escapeHTML(l)}</option>`).join('');
-const ageText = (sec) => sec == null ? 'never' : sec < 60 ? 'just now' : sec < 3600 ? Math.round(sec / 60) + 'm ago' : sec < 86400 ? Math.round(sec / 3600) + 'h ago' : Math.round(sec / 86400) + 'd ago';
+const ageText = (sec) => clientStale ? 'before the last page update' : sec == null ? 'never' : sec < 60 ? 'just now' : sec < 3600 ? Math.round(sec / 60) + 'm ago' : sec < 86400 ? Math.round(sec / 3600) + 'h ago' : Math.round(sec / 86400) + 'd ago';
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const rendered = new WeakMap();
 function setHTML(target, html) { if (rendered.get(target) !== html) { target.innerHTML = html; rendered.set(target, html); } }
@@ -103,9 +114,10 @@ function boardNote(b) {
   if (!b.has_snapshot) return `<p class="agent-live"><small>Kanban: ${({unchecked: 'not read yet.', failed: 'READ FAILED, no successful read yet.', not_connected: 'NOT CONNECTED.'})[b.status] || 'no data.'} Counts are tracked tasks only.</small></p>`;
   const flags = [b.stale ? 'STALE' : '', b.status !== 'connected' ? 'latest read did not succeed' : '', b.truncated ? 'TRUNCATED' : ''].filter(Boolean);
   const outside = [b.done ? `${b.done} done` : '', b.scheduled ? `${b.scheduled} scheduled` : '', b.unknown ? `${b.unknown} with an unknown state` : ''].filter(Boolean);
-  return `<p class="agent-live"><small>Includes ${plural(b.board_only, 'unlinked board record')} (observed ${ageText(b.age_seconds)}${flags.length ? ' · ' + flags.join(' · ') : ''}): ${b.in_tiles} in the tiles${outside.length ? ', ' + outside.join(', ') + ' (not in the tiles)' : ''}. ${plural(b.linked, 'linked card')} counted once, through ${b.linked === 1 ? 'its' : 'their'} task.${b.ambiguous ? ` ${plural(b.ambiguous, 'card')} not counted: the board is not pinned, so ${b.ambiguous === 1 ? 'it' : 'they'} may be already-linked work.` : ''} A board state is a record, not proof of a live worker.${b.drift ? ` ${plural(b.drift, 'linked task')} differ from the board.` : ''}</small></p>`;
+  return `<p class="agent-live"><small>Includes ${plural(b.board_only, 'unlinked board record')} (observed ${b.time_unreadable ? 'at an unreadable time' : ageText(b.age_seconds)}${flags.length ? ' · ' + flags.join(' · ') : ''}): ${b.in_tiles} in the tiles${outside.length ? ', ' + outside.join(', ') + ' (not in the tiles)' : ''}. ${plural(b.linked, 'linked card')} counted once, through ${b.linked === 1 ? 'its' : 'their'} task.${b.ambiguous ? ` ${plural(b.ambiguous, 'card')} not counted: ${b.pinned ? 'linked under another instance label' : 'the board is not pinned, so it may be already-linked work'}.` : ''} A board state is a record, not proof of a live worker.${b.drift ? ` ${plural(b.drift, 'linked task')} differ from the board.` : ''}</small></p>`;
 }
 function agentCard(a) {
+  if (clientStale && a.observation) a = {...a, connection:{...a.connection, status:'unknown', label:'CURRENT OBSERVATION UNAVAILABLE'}, observation:{...a.observation, working_now:false}};
   const c = a.counts, o = a.observation;
   let live;
   if (o) {
@@ -122,12 +134,13 @@ function attentionStrip() {
   const bt = state.agents.board_totals;
   const bparts = [['awaiting_review', 'awaiting review'], ['blocked', 'blocked'], ['running', 'running'], ['queued', 'queued']].filter(([key]) => bt[key]).map(([key, label]) => `${bt[key]} ${label}`);
   const hb = (state.agents.agents.find(a => a.board) || {}).board || {};
-  const others = [hb.scheduled ? `${hb.scheduled} scheduled` : '', hb.unknown ? `${hb.unknown} unknown state` : '', hb.ambiguous ? `${hb.ambiguous} possibly linked (board not pinned, not counted)` : ''].filter(Boolean);
+  const others = [hb.scheduled ? `${hb.scheduled} scheduled` : '', hb.unknown ? `${hb.unknown} unknown state` : '', hb.ambiguous ? `${hb.ambiguous} possibly linked (${hb.pinned ? 'linked under another instance label' : 'board not pinned'}, not counted)` : ''].filter(Boolean);
   const board = k.tasks.length ? `<p class="footnote attention">Hermes board, unlinked records (observed ${ageText(k.age_seconds)}${k.stale ? ' · STALE' : ''}${k.status !== 'connected' ? ' · latest read did not succeed' : ''}): ${[...bparts, ...others].join(' · ') || 'nothing active'}. Board states are records, not proof of a live worker.</p>` : '';
   if (!total) return `<p class="footnote attention">No tasks tracked yet. Agent cards show real connection status only; activity appears here once you track work.</p>${board}`;
   const chips = ['awaiting_review', 'blocked', 'failed', 'stale'].filter(key => t[key]).map(key => `<button class="attn st-${key}" data-task-filter="${key}"><b>${t[key]}</b> ${STATUS[key].toLowerCase()}</button>`).join('');
+  const legacy = t.completed_without_approval ? `<button class="attn st-blocked" data-task-filter="completed_without_approval"><b>${t.completed_without_approval}</b> completed without approval</button>` : '';
   const un = state.agents.unassigned_open ? `<span class="attn-note">${state.agents.unassigned_open} unassigned</span>` : '';
-  return `<div class="attention">${chips || '<span class="attn-note">Nothing is waiting on you.</span>'}${un}</div>${board}`;
+  return `<div class="attention">${chips || legacy || '<span class="attn-note">Nothing is waiting on you.</span>'}${legacy && chips ? legacy : ''}${un}</div>${board}`;
 }
 function taskCard(t) {
   const extra = [t.evidence_count ? `EVIDENCE ${t.evidence_count}` : 'NO EVIDENCE', t.completed_without_approval ? 'COMPLETED BEFORE THE APPROVAL GATE · NOT APPROVED' : REVIEW[t.review_state], t.requires_review ? '' : 'NO REVIEW REQUIRED (YOUR CHOICE)', t.link_count ? `LINKED ${t.link_count}` : ''].filter(Boolean).map(x => `<span>${x}</span>`).join('');
@@ -152,7 +165,7 @@ function renderAgents() {
   const projects = state.projects.map(p => [p.name, p.name]), pf = $('#task-project-filter'), pkey = JSON.stringify(projects);
   if (pf.dataset.key !== pkey) { pf.innerHTML = options([['', 'All projects'], ...projects, ['__none', 'No project']], pf.value); pf.dataset.key = pkey; $('#project-list').innerHTML = projects.map(([n]) => `<option value="${escapeHTML(n)}"></option>`).join(''); }
   const term = $('#task-search').value.toLowerCase(), agent = $('#task-agent-filter').value, status = $('#task-status-filter').value, done = $('#show-completed').checked, project = pf.value;
-  const rows = state.agent_tasks.filter(t => (status ? t.status === status : done || t.status !== 'completed') && (!agent || (agent === '__none' ? !t.agent_id : t.agent_id === agent)) && (!project || (project === '__none' ? !t.project : t.project === project)) && `${t.title} ${t.description} ${t.agent_name || ''} ${t.lane} ${t.project || ''}`.toLowerCase().includes(term));
+  const rows = state.agent_tasks.filter(t => (status === 'completed_without_approval' ? t.completed_without_approval : status ? t.status === status : done || t.status !== 'completed' || t.completed_without_approval) && (!agent || (agent === '__none' ? !t.agent_id : t.agent_id === agent)) && (!project || (project === '__none' ? !t.project : t.project === project)) && `${t.title} ${t.description} ${t.agent_name || ''} ${t.lane} ${t.project || ''}`.toLowerCase().includes(term));
   setHTML($('#agent-task-list'), rows.length ? rows.map(taskCard).join('') : `<div class="empty-desk"><strong>${state.agent_tasks.length ? 'No tasks match these filters.' : 'No agent tasks yet.'}</strong><p>${state.agent_tasks.length ? 'Clear a filter or include completed tasks.' : 'Track a task to record who should do it, what they reported and the evidence. Nothing is sent to the agent.'}</p></div>`);
   renderKanban();
 }
@@ -160,7 +173,7 @@ let kanbanShowAll = false;
 const KANBAN_LIST_LIMIT = 100;
 function renderKanban() {
   const k = state.kanban, c = k.counts;
-  const conn = ({connected:['CONNECTED · READ-ONLY', 'good'], not_connected:['NOT CONNECTED', 'pending'], failed:['READ FAILED', 'failed'], unchecked:['NOT READ YET', 'pending']})[k.status];
+  const conn = clientStale ? ['NOT UPDATED · CACHED DATA', 'failed'] : ({connected:['CONNECTED · READ-ONLY', 'good'], not_connected:['NOT CONNECTED', 'pending'], failed:['READ FAILED', 'failed'], unchecked:['NOT READ YET', 'pending']})[k.status];
   const attemptAge = k.last_attempt_at ? ageText(Math.max(0, Math.round((Date.now() - new Date(k.last_attempt_at)) / 1000))) : 'never';
   const facts = `<div class="kanban-facts"><div><span class="eyebrow">LAST ATTEMPT</span><p>${attemptAge}</p><span class="badge ${conn[1]}">${conn[0]}</span></div><div><span class="eyebrow">LAST SUCCESSFUL READ</span><p>${k.time_unreadable ? 'Stored read time is unreadable' : k.last_success_at ? `${ageText(k.age_seconds)} · ${escapeHTML(dateLabel(k.last_success_at))}` : 'None yet'}</p>${k.stale ? '<span class="badge failed">STALE</span>' : k.last_success_at ? '<span class="badge good">FRESH</span>' : ''}</div><div><span class="eyebrow">BOARD</span><p>${escapeHTML(k.board.label)}</p>${k.board.changed ? '<span class="badge failed">CONFIG CHANGED SINCE THIS READ</span>' : ''}</div></div>`;
   const error = k.error ? `<p class="kanban-error" role="status">${escapeHTML(k.error)}</p>` : '';
@@ -198,7 +211,7 @@ function renderTaskDialog(detail) {
     const board = !br ? '' : !br.comparable ? `<p>${why[br.reason] || 'This card cannot be compared with the last read.'}</p>` : !br.in_last_read ? (br.snapshot_truncated ? `<p>This card is not among the stored records of the last read, which was TRUNCATED (${br.snapshot_dropped} not stored). It may still be on the board.</p>` : '<p>This card is not in the last successful read (finished, archived, removed or the board changed).</p>') : `<p>${srcBadge('observed')} Board record: ${escapeHTML(br.record.status_raw)} (${escapeHTML(br.record.state_class || 'unknown')}), read ${ageText(state.kanban.age_seconds)}. A board state is a record, not proof of a live worker.${br.drift ? ' <b>This differs from the status tracked here.</b>' : ''}</p>`;
     return `<div class="evidence-row"><div><strong>${r.provider === 'hermes_kanban' ? 'Hermes Kanban card' : 'ClickUp task'}${r.label ? ' · ' + escapeHTML(r.label) : ''}</strong><p>${escapeHTML(r.instance)} / ${escapeHTML(r.scope)} / ${escapeHTML(r.external_id)}${r.context ? ' · list ' + escapeHTML(r.context) : ''}${r.url ? ' · ' + safeLink(r.url) : ''}</p>${board}<small>Linked ${escapeHTML(dateLabel(r.created))} · nothing was changed in the other system</small></div><button class="link-button" data-unlink="${r.id}" data-task="${id}">Unlink</button></div>`;
   }).join('') : '<p class="footnote">Not linked to a Hermes card or a ClickUp task. ClickUp owns business commitments; Hermes Kanban owns internal agent execution. Links point to them; they do not copy or replace them.</p>';
-  const free = state.kanban.tasks.filter(x => !x.linked_task_id).slice(0, 200);
+  const free = state.kanban.tasks.filter(x => !x.linked_task_id && !x.possibly_linked);
   const hermesForm = state.kanban.link.enabled ? (free.length ? `<form class="task-form" data-task-form="link-hermes" data-task="${id}"><label>Link a Hermes Kanban card <span class="optional">from the last read of ${escapeHTML(state.kanban.board.name)}</span><select name="external_id">${options(free.map(x => [x.external_id, `${x.title} · ${x.status_raw}`]), '')}</select></label><div class="dialog-actions"><span>Records the link here only. The task must be Hermes's (or unassigned).</span><button class="button outline" type="submit">Link card ↗</button></div></form>` : '<p class="footnote">No unlinked cards in the last read.</p>') : `<p class="footnote">${escapeHTML(state.kanban.link.reason)}</p>`;
   const clickForm = `<form class="task-form" data-task-form="link-clickup" data-task="${id}"><div class="form-grid"><label>ClickUp workspace id<input name="scope" maxlength="64" required></label><label>ClickUp task id<input name="external_id" maxlength="128" required></label></div><div class="form-grid"><label>List id <span class="optional">optional · where you found it</span><input name="context" maxlength="64"></label><label>Link <span class="optional">optional · http(s)</span><input name="url" type="url" maxlength="500" placeholder="https://"></label></div><div class="dialog-actions"><span>Reference only. This OS has no ClickUp adapter and changes nothing there.</span><button class="button outline" type="submit">Reference task ↗</button></div></form>`;
   const linkForms = hermesForm + clickForm;
@@ -271,7 +284,7 @@ function renderChat() {
   const run = state.runs.find(r => r.thread_id === currentThread);
   const progress = $('#run-status');
   const busy = state.runtime.busy;
-  $('#send-message').disabled = busy;
+  $('#send-message').disabled = busy || clientStale;
   $('#send-message').textContent = busy ? 'Working…' : 'Ask Keystal ↗';
   progress.classList.toggle('error', run && ['failed','interrupted'].includes(run.status));
   if (run?.status === 'running') {progress.textContent='Keystal is working. You can navigate or reload; this run stays recorded.';progress.hidden=false;}
@@ -284,14 +297,31 @@ async function refresh() {
   pollBusy = true;
   try {
     state = await api('/api/state');
+    lastPollAt = Date.now(); clientStale = false;
+    $('#connection-warning').hidden = true;
     renderToday(); renderCaptures(); renderAgents(); renderDocuments(); renderEvents(); renderConnections(); renderChat();
     $('#server-status').textContent = 'Local workspace connected';
     const label = state.runtime.preview_label || ''; $('#preview-banner').textContent = label; $('#preview-banner').hidden = !label;
   } catch (error) {
+    markPageStale();
     $('#server-status').textContent = error.status ? `Local server error — ${error.message}` : 'Local server unavailable — reload after restarting';
     $('#chat-status').textContent = error.status ? 'Server error' : 'Server unavailable';
     $('#send-message').disabled = true;
   } finally {pollBusy=false;}
+}
+function markPageStale() {
+  clientStale = true;
+  const warning = $('#connection-warning');
+  warning.textContent = lastPollAt ? `Not updated since ${dateLabel(new Date(lastPollAt).toISOString())} — figures below are from then. Reconnecting…` : 'Local workspace unavailable — no current data. Reconnecting…';
+  warning.hidden = false;
+  if (state) {
+    state.kanban.stale = true;
+    state.agents.agents.forEach(a => { if (a.board) a.board.stale = true; });
+    renderAgents(); renderConnections(); renderChat();
+  }
+  $('#server-status').textContent = 'Local workspace not updated';
+  $('#chat-status').textContent = 'Connection unavailable';
+  $('#send-message').disabled = true;
 }
 async function sendPrompt(prompt) {
   if (!state) return toast('Local workspace is not connected.');
@@ -366,3 +396,4 @@ $('#export-workspace').addEventListener('click',async()=>{try{const data=await a
 $('#today-date').textContent=new Intl.DateTimeFormat('en-SG',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Singapore'}).format(new Date()).toUpperCase();
 setView(localStorage.getItem('keystal.view') || 'today');
 refresh();setInterval(refresh,4000);
+setInterval(() => { if (lastPollAt && Date.now() - lastPollAt > 8000 && !clientStale) markPageStale(); }, 1000);

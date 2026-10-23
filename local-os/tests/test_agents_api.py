@@ -124,6 +124,24 @@ class Security(ApiCase):
                            ('/api/agent-tasks/update', {'id': tid, 'title': 'S1234567D'})):
             self.assertEqual(self.c.post(path, body)[0], 400, path)
 
+    def test_personal_identifiers_in_urls_never_reach_evidence_history_links_or_export(self):
+        tid = self.task()
+        before = self.detail(tid)
+        for url in ('https://drive.example.com/clients/S1234567D/report',
+                    'https://app.clickup.com/t/abc?client=T7654321A',
+                    'https://drive.example.com/clients/%53%31%32%33%34%35%36%37%44/report'):
+            for path, body in (('/api/agent-tasks/evidence', {'id': tid, 'label': 'Output', 'url': url}),
+                               ('/api/agent-tasks/link', {'id': tid, 'provider': 'clickup', 'scope': 'w', 'external_id': uuid.uuid4().hex, 'url': url})):
+                with self.subTest(path=path, url=url):
+                    code, response = self.c.post(path, body)
+                    self.assertEqual(code, 400)
+                    self.assertIn('Remove personal identification numbers', response['error'])
+        after = self.detail(tid)
+        self.assertEqual((after['evidence'], after['history'], after['refs']), (before['evidence'], before['history'], before['refs']))
+        exported = json.dumps(self.c.request('/api/export')[1])
+        for identifier in ('S1234567D', 'T7654321A', '%53%31%32%33%34%35%36%37%44'):
+            self.assertNotIn(identifier, exported)
+
     def test_markup_is_stored_inertly(self):
         payload = '<img src=x onerror="window.__xss=1">'
         tid = self.task(title=payload)

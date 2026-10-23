@@ -13,6 +13,8 @@ ROOT="${2:-$HOME/Keystal/backups}"
 [ -d "$SRC" ] || { echo "No such directory: $SRC" >&2; exit 2; }
 git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "Not a git workspace: $SRC" >&2; exit 2; }
 SRC="$(cd "$SRC" && pwd -P)"
+case "$ROOT" in "$SRC"|"$SRC"/*) echo "Backup root is inside source workspace; refusing." >&2; exit 2;; esac
+ROOT="$(mkdir -p "$ROOT" && cd "$ROOT" && pwd -P)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="$ROOT/$(basename "$SRC")-$STAMP"
 [ ! -e "$DEST" ] || { echo "Destination exists, refusing: $DEST" >&2; exit 2; }
@@ -30,7 +32,7 @@ LIST="$DEST/.untracked-list"
 git -C "$SRC" ls-files --others --exclude-standard -z > "$LIST"
 if [ -s "$LIST" ]; then (cd "$SRC" && tar -czf "$DEST/untracked.tgz" --null -T "$LIST"); else : > "$DEST/untracked.none"; fi
 rm -f "$LIST"
-git -C "$SRC" bundle create "$DEST/repo.bundle" --all >/dev/null 2>&1 || echo "no bundle (repository has no commits)" > "$DEST/repo.bundle.none"
+if git -C "$SRC" rev-parse --verify HEAD >/dev/null 2>&1; then git -C "$SRC" bundle create "$DEST/repo.bundle" --all || { echo "bundle creation failed" >&2; exit 1; }; else echo "no commits" > "$DEST/repo.bundle.none"; fi
 cp -Rp "$SRC" "$DEST/full-copy"
 if command -v sha256sum >/dev/null 2>&1; then SUM="sha256sum"; else SUM="shasum -a 256"; fi
 (cd "$DEST" && find . -type f ! -path './full-copy/*' ! -name SHA256SUMS -print0 | xargs -0 $SUM > SHA256SUMS)

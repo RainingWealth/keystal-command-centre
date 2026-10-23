@@ -11,6 +11,7 @@
 @media(max-width:640px){.agent-grid{grid-template-columns:1fr}.task-form .form-grid{grid-template-columns:1fr;gap:0}.toolbar .select-filter,.toolbar .select-filter select{width:100%}.task-card{padding:16px}.evidence-row{flex-wrap:wrap}.attn{flex:1 1 40%;justify-content:center}}
 
 .preview-banner{background:#6b4b00;color:#fff;font-size:11px;font-weight:600;letter-spacing:.8px;padding:9px 30px;text-align:center}
+.connection-warning{position:sticky;top:0;z-index:10;background:#7d1f1f;color:white;padding:14px 20px;font-size:13px;line-height:1.5}
 .kanban-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin:12px 0 8px}.kanban-facts p{font-size:12px;margin:5px 0 0;color:var(--ink)}.kanban-facts .badge{margin-top:6px}
 .kanban-error{font-size:11px;color:var(--red);background:#f8e4e4;border-radius:4px;padding:9px 11px;margin:8px 0}.kanban-keep{font-size:11px;color:#7a5d1b;background:#f2ecdc;border-radius:4px;padding:9px 11px;margin:8px 0}
 .kanban-head{display:block}.kanban-head>div{width:100%}.kanban-tail{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0}.kanban-tail .link-button{min-height:32px;font-size:9px;color:#6a5416;text-decoration:underline}

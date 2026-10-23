@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -83,6 +84,11 @@ def main(argv=None):
     env['KEYSTAL_OS_PREVIEW_LABEL'] = label
     process = subprocess.Popen([sys.executable, str(LOCAL_OS / 'server.py')], env=env)
     base = f'http://127.0.0.1:{args.port}'
+    with socket.socket() as probe:
+        probe.settimeout(.2)
+        if probe.connect_ex(('127.0.0.1', args.port)) == 0:
+            print(f'Port {args.port} is already in use; refusing to seed another server.', file=sys.stderr)
+            return 2
 
     def stop(signum, frame):
         raise KeyboardInterrupt
@@ -91,7 +97,12 @@ def main(argv=None):
     try:
         for _ in range(100):
             try:
-                urllib.request.urlopen(base, timeout=1).close()
+                if process.poll() is not None:
+                    return process.returncode or 1
+                response = urllib.request.urlopen(base, timeout=1)
+                if response.geturl().split('/')[2] != f'127.0.0.1:{args.port}':
+                    raise RuntimeError('unexpected preview responder')
+                response.close()
                 break
             except Exception:
                 if process.poll() is not None:
@@ -102,7 +113,10 @@ def main(argv=None):
             return 1
         if not args.no_seed:
             client = Client(base)
-            client.bootstrap()
+            state = client.bootstrap()
+            if state.get('runtime', {}).get('preview_label') != label:
+                print('Preview responder identity did not match; refusing to seed.', file=sys.stderr)
+                return 2
             seed(client)
         print(f'\n  Keystal OS isolated preview: {base}/\n  commit: {commit()}\n  data:   {scratch / "state"} (deleted on exit; your real database is not opened)\n  documents: one synthetic document (your real ~/Keystal documents are not shown)\n  {label}\n  Loopback only: reachable from this computer only. Ctrl+C to stop.\n', flush=True)
         process.wait()

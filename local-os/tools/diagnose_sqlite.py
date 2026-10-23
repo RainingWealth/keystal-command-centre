@@ -104,12 +104,18 @@ os._exit(9)"""
 def filesystem(path):
     """df and mount facts for the folder holding `path` (metadata only)."""
     path = Path(path).expanduser().resolve()
+    requested = path
+    missing = not path.exists()
     while not path.exists():
         path = path.parent
     df = subprocess.run(['df', '-P', str(path)], capture_output=True, text=True).stdout.strip().splitlines()
     mountpoint = df[-1].split()[-1] if len(df) > 1 else None
     mounts = subprocess.run(['/sbin/mount'] if Path('/sbin/mount').exists() else ['mount'], capture_output=True, text=True).stdout.splitlines()
-    return {'folder': str(path), 'df': df[-1] if df else None, 'mount': next((m for m in mounts if mountpoint and f' on {mountpoint} ' in m), None)}
+    text = str(requested)
+    cloud = any(x in text for x in ('/Library/CloudStorage/', '/Library/Mobile Documents/', '/Desktop/', '/Documents/'))
+    return {'folder': str(requested), 'resolved_path': str(requested), 'resolved_existing_folder': str(path), 'exists': not missing, 'missing': missing, 'cloud_sync_risk': cloud,
+            'warning': ('data folder is missing; filesystem facts describe its nearest existing parent' if missing else '') + ('; possible cloud sync location; df/mount cannot prove it is unsynced' if cloud else ''),
+            'df': df[-1] if df else None, 'mount': next((m for m in mounts if mountpoint and f' on {mountpoint} ' in m), None)}
 
 
 def concurrent(db, outdir, seconds, writer_in_process):

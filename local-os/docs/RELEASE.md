@@ -4,7 +4,7 @@ Scope: one trustworthy **local** release. Loopback only, no deployment, no paid 
 
 ## Verdict
 
-**Not ready to activate against production yet.** On your Mac run on 21 October (commit b881114), every step passed except the test suite (3 failures, a test-setup fault, since fixed). The backup and restore test were not run:
+**Not ready to activate against production yet.** The five-lens review findings are now implemented on this branch with regression coverage; run the complete suite and the Mac backup/diagnostic steps below before activation. The production database remains untouched.
 
 | Step on the Mac | Result |
 | --- | --- |
@@ -28,6 +28,8 @@ Before `python3 local-os/server.py --migrate`:
 4. The findings in [REVIEW_FINDINGS.md](REVIEW_FINDINGS.md) are fixed, the blocker first, each with a regression test.
 
 ## Results recorded for code commit bc41c89 (cloud sandbox, 22 October 2026)
+
+This branch adds schema migration v5. v1-v4 are frozen; v4 is the pre-review schema and v5 is the current code. A server lock at `<data folder>/keystal-server.lock` permits one live server per data folder, and session cookies are port-qualified.
 
 This documentation commit changes no code. Self-contained suite, `python3 -m unittest discover -s local-os/tests`, with Playwright 1.56 and Chromium present, so the browser tests ran (none skipped):
 
