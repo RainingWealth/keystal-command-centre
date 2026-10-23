@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {"hooks": [{"type": "command", "command": "python3 \"$HOME/Keystal/keystal-command-centre/local-os/hooks/claude_watch_hook.py\"", "async": true, "timeout": 5}]}
+    ],
+    "PostToolUse": [
+      {"matcher": "*", "hooks": [{"type": "command", "command": "python3 \"$HOME/Keystal/keystal-command-centre/local-os/hooks/claude_watch_hook.py\"", "async": true, "timeout": 5}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "python3 \"$HOME/Keystal/keystal-command-centre/local-os/hooks/claude_watch_hook.py\"", "async": true, "timeout": 5}]}
+    ],
+    "SessionEnd": [
+      {"hooks": [{"type": "command", "command": "python3 \"$HOME/Keystal/keystal-command-centre/local-os/hooks/claude_watch_hook.py\"", "async": true, "timeout": 5}]}
+    ]
+  }
+}
