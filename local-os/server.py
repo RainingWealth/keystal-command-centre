@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Keystal OS: loopback-only, single-user workbench. Not a public deployment."""
 import argparse
+import fcntl
 import datetime as dt
 import hashlib
 import json
@@ -11,11 +12,19 @@ import secrets
 import shutil
 import sqlite3
 import subprocess
+import sys
 import threading
+import time
+import traceback
 import uuid
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
+
+import agent_events
+import agent_tasks
+import migrations
+from agent_tasks import ApiError
 
 ROOT = Path(__file__).resolve().parent
 DATA = Path(os.environ.get('KEYSTAL_OS_DATA', str(Path.home() / 'Keystal/outputs/keystal-os/local-state')))
@@ -25,9 +34,16 @@ DB = DATA / 'workbench.sqlite3'
 PORT = int(os.environ.get('KEYSTAL_OS_PORT', '8766'))
 TOKEN = secrets.token_urlsafe(32)
 CSRF = secrets.token_urlsafe(32)
-HERMES = shutil.which('hermes')
+WATCH_TOKEN_FILE = DATA / 'watch-token'  # bearer token for POST /api/watch/events only; never logged, returned or stored in the database
+WATCH_TOKEN = b''
+WATCH_MAX_BYTES = 4096
+HERMES = shutil.which(os.environ.get('KEYSTAL_OS_HERMES', 'hermes'))
+KANBAN_BOARD = os.environ.get('KEYSTAL_OS_KANBAN_BOARD', '').strip()
+HERMES_INSTANCE = os.environ.get('KEYSTAL_OS_HERMES_INSTANCE', 'local').strip()
+PREVIEW_LABEL = os.environ.get('KEYSTAL_OS_PREVIEW_LABEL', '').strip()[:80]
 BUSY = threading.Lock()
-DOCROOT = Path.home() / 'Keystal/outputs/keystal-os'
+KANBAN_BUSY = threading.Lock()
+DOCROOT = Path(os.environ.get('KEYSTAL_OS_DOCROOT', str(Path.home() / 'Keystal/outputs/keystal-os')))
 DOCS = {
     'manual': ('Operating manual', 'Keystal OS.md', 'Command, routing and decision rights'),
     'tools': ('Tool register', 'Keystal OS - Tool Register.md', 'Which system owns what'),
@@ -42,8 +58,8 @@ AI services, loans, mortgages and other ventures; do not default to insurance.
 This bridge is drafting and public-web research only. No terminal, file-writing, CRM,
 calendar or messaging tools are granted. Never claim to save/send/book/update any external
 record. The web app itself stores this conversation separately. Local captures are draft
-staging, NOT ClickUp tasks. Obsidian/Dropbox is knowledge; ClickUp is task authority;
-Airtable is CRM. Do not invent pipeline figures, tasks, deadlines, connectivity or facts.
+staging, NOT ClickUp tasks. Obsidian/Dropbox is knowledge; ClickUp owns business commitments;
+Hermes Kanban owns internal agent execution; Airtable is CRM. Do not invent pipeline figures, tasks, deadlines, connectivity or facts.
 Never send or solicit private client identifiers, health or financial details. Use [CLIENT].
 Do not search public web for private client information. Ask for sanitised context instead.
 For missing present-day evidence, use available public research tools or label unchecked.
@@ -58,18 +74,70 @@ def now():
 def connect():
     c = sqlite3.connect(DB, timeout=15)
     c.row_factory = sqlite3.Row
+    c.execute('PRAGMA foreign_keys=ON')
     return c
 
-def init():
+def refuse(message):
+    print(message, file=sys.stderr)
+    sys.exit(2)
+
+def watch_token():
+    """The bearer token for /api/watch/events, created once (0600, in the data folder, outside the database)."""
+    try:
+        fd = os.open(WATCH_TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    except FileExistsError:
+        fd = os.open(WATCH_TOKEN_FILE, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            os.fchmod(fd, 0o600)
+            token = os.read(fd, 256).strip()
+        finally:
+            os.close(fd)
+        if len(token) >= 32:
+            return token
+        refuse(f'{WATCH_TOKEN_FILE} is not a valid token file. Delete it and start again to create a new one. Nothing was changed.')
+    token = secrets.token_urlsafe(32).encode()
+    try:
+        os.write(fd, token + b'\n')
+    finally:
+        os.close(fd)
+    return token
+
+def startup_checks():
+    """Fail at startup, never silently fall back: a wrong board or profile would be displayed as the selected one."""
+    if KANBAN_BOARD and not agent_tasks.BOARD.fullmatch(KANBAN_BOARD):
+        refuse(f'KEYSTAL_OS_KANBAN_BOARD={KANBAN_BOARD[:80]!r} is not a valid Hermes board name (lowercase letters, digits, hyphen and underscore; 1-64 characters, starting with a letter or digit). Refusing to start rather than read a different board.')
+    if not agent_tasks.ID_PART.fullmatch(HERMES_INSTANCE):
+        refuse(f'KEYSTAL_OS_HERMES_INSTANCE={HERMES_INSTANCE[:80]!r} is not a valid instance/profile label.')
+
+def init(migrate_ok=False):
+    """Open the database. A database that already holds data is only migrated on an explicit --migrate."""
+    try:
+        state = migrations.plan(DB)
+        if state.get('needs_recovery'):
+            # A writer died mid-transaction (power loss, kill, Ctrl+C during a write). SQLite rolls the interrupted
+            # transaction back on any read-write open; the original server did this implicitly on every start.
+            result = migrations.recover(DB)
+            print(f'NOTE: {DB} had an interrupted transaction; SQLite rolled it back (integrity_check: {result}).', file=sys.stderr)
+            state = migrations.plan(DB)
+    except sqlite3.Error as exc:
+        refuse(f'{DB} could not be opened: {exc}. If another program is writing to it (a second Keystal server, a sync tool), stop it and start again. '
+               f'Nothing was changed. Details: python3 local-os/tools/db_tool.py inspect --db "{DB}"')
+    if state.get('invalid_version'):
+        refuse(f"{DB} has user_version {state['current']}, which this code never writes. Refusing to open it. Nothing was changed.")
+    if state.get('newer_than_code'):
+        refuse(f"{DB} is schema v{state['current']}, newer than this Keystal OS (v{state['latest']}). Refusing to open it.")
+    if state['conflicts']:
+        names = ', '.join(sorted({c['name'] for c in state['conflicts']}))
+        refuse(f'{DB} has tables that conflict with this version ({names}), probably from another implementation. Nothing was changed. Run: python3 local-os/tools/db_tool.py inspect --db "{DB}"')
+    if state['pending'] and state['has_data'] and not migrate_ok:
+        refuse(f"{DB} is at schema v{state['current']} and this version needs v{state['latest']}. Nothing was changed.\n"
+               f'1) python3 local-os/tools/db_tool.py backup --db "{DB}"\n2) python3 local-os/tools/db_tool.py migrate-check --db "{DB}"\n3) start with: python3 local-os/server.py --migrate')
+    migrations.migrate(DB)
     with connect() as c:
-        c.executescript('''
-        CREATE TABLE IF NOT EXISTS captures(id TEXT PRIMARY KEY,title TEXT NOT NULL,lane TEXT NOT NULL,owner TEXT NOT NULL,due TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'inbox',pinned INTEGER DEFAULT 0,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS threads(id TEXT PRIMARY KEY,title TEXT NOT NULL,session_id TEXT,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,role TEXT NOT NULL,body TEXT NOT NULL,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,status TEXT NOT NULL,created TEXT NOT NULL,ended TEXT,error TEXT,request_key TEXT UNIQUE NOT NULL,payload_hash TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,label TEXT NOT NULL,created TEXT NOT NULL);
-        CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);
-        ''')
+        legacy = migrations.invariants(c).get('completed_without_approval_and_evidence', 0)
+        if legacy:
+            print(f'NOTE: {legacy} completed task(s) need review but have no approval and evidence. They predate the approval gate (schema v2 allowed '
+                  'switching review on after completion) and are flagged in the dashboard. Reopen them to put them through review.', file=sys.stderr)
         c.execute("UPDATE runs SET status='interrupted',error='Local server restarted; request was not retried automatically.',ended=? WHERE status='running'", (now(),))
     os.chmod(DB, 0o600)
 
@@ -79,8 +147,27 @@ def event(c, kind, label):
 def meta(c, key, value):
     c.execute('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)', (key, json.dumps(value)))
 
+def sweep_orphan_runs(c, stamp):
+    """A run still 'running' while no turn holds BUSY lost its result: the bridge could not record it (details on stderr)."""
+    if c.execute("SELECT 1 FROM runs WHERE status='running' LIMIT 1").fetchone() and BUSY.acquire(blocking=False):
+        try:
+            changed = c.execute("UPDATE runs SET status='interrupted',error=?,ended=? WHERE status='running'",
+                      ('The local bridge stopped without recording a result (details are in the server window). Nothing was retried.', stamp))
+            if changed.rowcount:
+                event(c, 'error', 'A Keystal turn ended without a recorded result — no completed result claimed')
+        finally:
+            BUSY.release()
+
 def getstate():
     with connect() as c:
+        stamp = now()
+        agent_tasks.sweep_stale(c, stamp)
+        sweep_orphan_runs(c, stamp)
+    with connect() as c:
+        stamp = now()
+        c.execute('BEGIN')
+        runtime = {'mode': 'local', 'bridge_available': bool(HERMES), 'busy': BUSY.locked(), 'hosted': False, 'chat_scope': 'Drafting + public web research', 'preview_label': PREVIEW_LABEL}
+        kanban = agent_tasks.kanban_view(c, stamp)
         return {
             'csrf': CSRF,
             'captures': [dict(r) for r in c.execute('SELECT * FROM captures ORDER BY pinned DESC,created DESC')],
@@ -89,13 +176,48 @@ def getstate():
             'runs': [dict(r) for r in c.execute('SELECT id,thread_id,status,created,ended,error FROM runs ORDER BY created DESC LIMIT 30')],
             'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 80')],
             'checks': {r['key']: json.loads(r['value']) for r in c.execute('SELECT * FROM meta')},
-            'runtime': {'mode': 'local', 'bridge_available': bool(HERMES), 'busy': BUSY.locked(), 'hosted': False, 'chat_scope': 'Drafting + public web research'},
+            'runtime': runtime,
+            'agents': agent_tasks.overview(c, runtime, kanban),
+            'agent_tasks': agent_tasks.list_tasks(c),
+            'projects': agent_tasks.list_projects(c),
+            'kanban': kanban,
             'documents': [{'id': k, 'title': v[0], 'description': v[2], 'available': (DOCROOT / v[1]).is_file(), 'source': 'Local saved document'} for k, v in DOCS.items()],
             'server_time': now(),
+            'export_data': agent_tasks.export_rows(c),
         }
 
-class BadRequest(Exception):
+class BadRequest(ApiError):
     pass
+
+BUSY_READ = object()
+
+def refresh_kanban(manual=False):
+    """Read-only refresh of the Hermes Kanban snapshot. Returns the stored read bookkeeping, or BUSY_READ if a read is
+    already running. The configured board is used exactly as named; it is never replaced by a default. Anything that
+    goes wrong is recorded as a failed attempt (the last good snapshot is kept). Returns None only when even that record
+    could not be written; callers must report that, never the previous result."""
+    if not KANBAN_BUSY.acquire(blocking=False):
+        return BUSY_READ
+    board = KANBAN_BOARD or None
+    try:
+        result = agent_tasks.fetch_kanban(HERMES, board)
+        with connect() as c:
+            return agent_tasks.store_kanban(c, now(), result, board, HERMES_INSTANCE, manual)
+    except Exception:
+        traceback.print_exc()
+        try:
+            with connect() as c:
+                return agent_tasks.store_kanban(c, now(), {'status': 'failed', 'detail': 'Hermes Kanban data could not be read or stored (unexpected content). The last good read is kept; nothing was changed in Hermes.'}, board, HERMES_INSTANCE, manual)
+        except Exception:
+            traceback.print_exc()
+            return None
+    finally:
+        KANBAN_BUSY.release()
+
+def kanban_loop(seconds):
+    while True:
+        refresh_kanban()
+        time.sleep(seconds)
 
 def text(data, key, maximum, default=None):
     value = data.get(key, default)
@@ -126,11 +248,13 @@ def run_hermes(run_id, thread_id, prompt, session_id):
             raise RuntimeError('Hermes did not complete this turn. Check provider access in the main Hermes app; no success was recorded.')
         answer = str(final['text'])
         with connect() as c:
-            c.execute('INSERT INTO messages VALUES(?,?,?,?,?)', (uuid.uuid4().hex, thread_id, 'assistant', answer, now()))
-            c.execute('UPDATE threads SET session_id=? WHERE id=?', (final.get('session_id') or session_id, thread_id))
-            c.execute("UPDATE runs SET status='completed',ended=? WHERE id=?", (now(), run_id))
-            meta(c, 'chat', {'status': 'verified', 'checked_at': now(), 'detail': 'A real Hermes turn completed. Drafting / public-web research only.'})
-            event(c, 'chat', 'Keystal returned a verified response')
+            running = c.execute("SELECT 1 FROM runs WHERE id=? AND status='running'", (run_id,)).fetchone()
+            if running:
+                c.execute('INSERT INTO messages VALUES(?,?,?,?,?)', (uuid.uuid4().hex, thread_id, 'assistant', answer, now()))
+                c.execute('UPDATE threads SET session_id=? WHERE id=?', (final.get('session_id') or session_id, thread_id))
+                c.execute("UPDATE runs SET status='completed',ended=?,error=NULL WHERE id=? AND status='running'", (now(), run_id))
+                meta(c, 'chat', {'status': 'verified', 'checked_at': now(), 'detail': 'A real Hermes turn completed. Drafting / public-web research only.'})
+                event(c, 'chat', 'Keystal returned a verified response')
     except subprocess.TimeoutExpired:
         fail(run_id, 'Turn timed out after 180 seconds. The CLI client was stopped; underlying gateway work may still finish. Check Hermes before retrying.')
     except Exception as exc:
@@ -139,10 +263,14 @@ def run_hermes(run_id, thread_id, prompt, session_id):
         BUSY.release()
 
 def fail(run_id, error):
-    with connect() as c:
-        c.execute("UPDATE runs SET status='failed',ended=?,error=? WHERE id=?", (now(), error, run_id))
-        meta(c, 'chat', {'status': 'failed', 'checked_at': now(), 'detail': error})
-        event(c, 'error', 'Keystal turn failed — no completed result claimed')
+    try:
+        with connect() as c:
+            changed = c.execute("UPDATE runs SET status='failed',ended=?,error=? WHERE id=? AND status='running'", (now(), error, run_id))
+            if changed.rowcount:
+                meta(c, 'chat', {'status': 'failed', 'checked_at': now(), 'detail': error})
+                event(c, 'error', 'Keystal turn failed — no completed result claimed')
+    except Exception:
+        traceback.print_exc()  # the run stays 'running' until the next state read marks it interrupted (sweep_orphan_runs)
 
 class Handler(BaseHTTPRequestHandler):
     server_version = 'KeystalLocal/1.0'
@@ -153,7 +281,7 @@ class Handler(BaseHTTPRequestHandler):
     def authorised(self):
         try:
             cookie = SimpleCookie(self.headers.get('Cookie', ''))
-            return secrets.compare_digest(cookie['keystal_local'].value, TOKEN)
+            return secrets.compare_digest(cookie[f'keystal_local_{PORT}'].value, TOKEN)
         except (KeyError, ValueError):
             return False
     def send(self, code, data, content_type='application/json; charset=utf-8', bootstrap=False):
@@ -167,10 +295,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
         if bootstrap:
-            self.send_header('Set-Cookie', f'keystal_local={TOKEN}; HttpOnly; SameSite=Strict; Path=/')
+            self.send_header('Set-Cookie', f'keystal_local_{PORT}={TOKEN}; HttpOnly; SameSite=Strict; Path=/')
         self.end_headers()
         self.wfile.write(body)
     def do_GET(self):
+        try:
+            return self.get()
+        except Exception:
+            traceback.print_exc()
+            return self.send(500, {'error': 'Local database or file error: the page could not be loaded. Details are in the server window.'})
+    def get(self):
         if not self.validhost():
             return self.send(403, {'error': 'Invalid host'})
         path = urlsplit(self.path).path
@@ -188,11 +322,20 @@ class Handler(BaseHTTPRequestHandler):
             if not doc or not (DOCROOT / doc[1]).is_file():
                 return self.send(404, {'error': 'Document unavailable'})
             return self.send(200, {'title': doc[0], 'content': (DOCROOT / doc[1]).read_text(), 'source': str(DOCROOT / doc[1]), 'scope': 'Saved document, not live source-system state'})
+        if path.startswith('/api/agent-tasks/'):
+            try:
+                with connect() as c:
+                    return self.send(200, agent_tasks.task_detail(c, path.rsplit('/', 1)[-1]))
+            except ApiError as exc:
+                return self.send(exc.status, {'error': str(exc)})
         if path == '/api/export':
             state = getstate()
-            return self.send(200, {k: state[k] for k in ('captures', 'threads', 'messages', 'events', 'server_time')})
+            agent_data = state.pop('export_data')
+            return self.send(200, {**{k: state[k] for k in ('captures', 'threads', 'messages', 'events', 'server_time')}, **agent_data})
         return self.send(404, {'error': 'Not found'})
     def do_POST(self):
+        if urlsplit(self.path).path == '/api/watch/events':
+            return self.watch_event()
         if not self.validhost() or not self.authorised():
             return self.send(403, {'error': 'Access rejected'})
         if self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}', f'http://localhost:{PORT}') or not secrets.compare_digest(self.headers.get('X-Keystal-CSRF', ''), CSRF):
@@ -207,11 +350,60 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(data, dict):
                 raise BadRequest('Object required')
             return self.post(urlsplit(self.path).path, data)
-        except (ValueError, BadRequest) as exc:
+        except ApiError as exc:
+            return self.send(exc.status, {'error': str(exc)})
+        except ValueError as exc:
             return self.send(400, {'error': str(exc)})
         except Exception:
+            traceback.print_exc()
             return self.send(500, {'error': 'Local operation failed. No external update claimed.'})
+    def watch_event(self):
+        """Local AI tooling reports activity metadata. Dedicated bearer token only: the browser cookie and CSRF token
+        never authenticate here, and a request carrying an Origin (any browser page) is refused, so no CORS is offered."""
+        if not self.validhost() or self.headers.get('Origin') is not None:
+            return self.send(403, {'error': 'Access rejected'})
+        scheme, _, presented = self.headers.get('Authorization', '').partition(' ')
+        if not WATCH_TOKEN or scheme.lower() != 'bearer' or not secrets.compare_digest(presented.strip().encode(), WATCH_TOKEN):
+            self.close_connection = True
+            return self.send(401, {'error': 'Bearer token required'})
+        if self.headers.get('Content-Type', '').split(';')[0].strip() != 'application/json':
+            return self.send(415, {'error': 'JSON required'})
+        try:
+            size = int(self.headers.get('Content-Length', '-1'))
+        except ValueError:
+            size = -1
+        if size < 2 or size > WATCH_MAX_BYTES:
+            self.close_connection = True
+            return self.send(413, {'error': f'Body must be 2 to {WATCH_MAX_BYTES} bytes with a Content-Length'})
+        try:
+            data = json.loads(self.rfile.read(size))
+            if not isinstance(data, dict):
+                raise BadRequest('Object required')
+            with connect() as c:
+                c.isolation_level = None
+                code, payload = agent_events.record(c, now(), data)
+            return self.send(code, payload)
+        except ApiError as exc:
+            return self.send(exc.status, {'error': str(exc)})
+        except ValueError:
+            return self.send(400, {'error': 'Invalid JSON'})
+        except Exception:
+            traceback.print_exc()
+            return self.send(500, {'error': 'Local operation failed. The event was not stored.'})
     def post(self, path, data):
+        if path in agent_tasks.ROUTES:
+            with connect() as c:
+                c.execute('BEGIN IMMEDIATE')
+                code, payload = agent_tasks.ROUTES[path](c, now(), data)
+            return self.send(code, payload)
+        if path == '/api/kanban/refresh':
+            result = refresh_kanban(manual=True)
+            if result is BUSY_READ:
+                return self.send(409, {'error': 'A Kanban read is already running.'})
+            if result is None:
+                return self.send(500, {'error': 'This Kanban read could not be recorded in the local database, so the panel still shows the previous read. Details are in the server window.'})
+            with connect() as c:
+                return self.send(200, agent_tasks.kanban_view(c, now()))
         if path == '/api/captures':
             title = text(data, 'title', 400)
             lane = text(data, 'lane', 30, 'Operate')
@@ -271,10 +463,13 @@ class Handler(BaseHTTPRequestHandler):
                     c.execute('INSERT INTO messages VALUES(?,?,?,?,?)', (uuid.uuid4().hex, tid, 'user', prompt, now()))
                     c.execute('INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)', (rid, tid, 'running', now(), None, None, key, digest))
                     event(c, 'chat', 'Request accepted by the local Hermes bridge')
-                threading.Thread(target=run_hermes, args=(rid, tid, prompt, session), daemon=True).start()
+                worker = threading.Thread(target=run_hermes, args=(rid, tid, prompt, session), daemon=True)
+                worker.start()
+                started = True
                 return self.send(202, {'run_id': rid, 'thread_id': tid})
             except Exception:
-                BUSY.release()
+                if not locals().get('started', False):
+                    BUSY.release()
                 raise
         if path == '/api/check/dropbox':
             py = Path.home() / '.hermes/hermes-agent/venv/bin/python'
@@ -292,8 +487,27 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(404, {'error': 'Not found'})
 
 if __name__ == '__main__':
-    init()
-    server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    parser = argparse.ArgumentParser(description='Keystal OS: loopback-only, single-user workbench.')
+    parser.add_argument('--migrate', action='store_true', help='apply pending database migrations to an existing database (a backup is taken first)')
+    args = parser.parse_args()
+    startup_checks()
+    WATCH_TOKEN = watch_token()
+    lock_path = DATA / 'keystal-server.lock'
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    os.chmod(lock_path, 0o600)
+    try:
+        fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print(f'Another Keystal OS server is already using {DATA}. Nothing was changed.', file=sys.stderr)
+        sys.exit(2)
+    # Bind before touching the database: a port collision must not sweep or migrate live state.
+    try:
+        server = ThreadingHTTPServer(('127.0.0.1', PORT), Handler)
+    except OSError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(2)
+    init(args.migrate)
+    threading.Thread(target=kanban_loop, args=(agent_tasks.kanban_timing()[0] or 10**9,), daemon=True).start()
     print(f'Keystal OS local server: http://127.0.0.1:{PORT}', flush=True)
     print('Loopback only. No cloud deployment. Ctrl+C stops the server.', flush=True)
     server.serve_forever()

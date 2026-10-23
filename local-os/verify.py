@@ -89,15 +89,40 @@ with tempfile.TemporaryDirectory(prefix='keystal-test-',dir=os.environ.get('TMPD
         check('Export excludes CSRF and provider credentials','csrf' not in client.request('/api/export')[1] and 'runtime' not in client.request('/api/export')[1])
         check('Sensitive identifier blocked before model',client.request('/api/chat',{'prompt':'S1234567D','request_key':uuid.uuid4().hex})[0]==400)
         check('Unknown conversation rejected',client.request('/api/chat',{'prompt':'hello','thread_id':'unknown','request_key':uuid.uuid4().hex})[0]==404)
+        # Agents & tasks: tracking only, honest provenance, evidence-gated approval.
+        state=client.request('/api/state')[1]
+        check('Five agents registered',[a['name'] for a in state['agents']['agents']]==['Hermes','ChatGPT','Claude','Codex','Gemini'])
+        check('Unconnected agents report Not Connected',all(a['connection']['status']=='not_connected' for a in state['agents']['agents'] if a['id']!='hermes'))
+        check('No agent activity is invented on a fresh workspace',not state['agent_tasks'] and all(sum(a['counts'].values())==0 or (a['id']=='hermes' and a.get('board')) for a in state['agents']['agents']))
+        check('Agent task write needs CSRF',client.request('/api/agent-tasks',{'title':'QA task — synthetic'},{'X-Keystal-CSRF':''})[0]==403)
+        check('Empty agent task rejected',client.request('/api/agent-tasks',{'title':''})[0]==400)
+        code,made,_=client.request('/api/agent-tasks',{'title':'QA agent task — synthetic','agent_id':'claude'}); tid=made['id']
+        check('Agent task written',code==201)
+        check('Browser cannot claim observed provenance',client.request('/api/agent-tasks/status',{'id':tid,'status':'running','source':'observed'})[0]==400)
+        check('Agent-reported status accepted',client.request('/api/agent-tasks/status',{'id':tid,'status':'running','source':'agent_reported'})[0]==200)
+        check('Completion without review rejected',client.request('/api/agent-tasks/status',{'id':tid,'status':'completed'})[0]==400)
+        client.request('/api/agent-tasks/status',{'id':tid,'status':'awaiting_review'})
+        check('Approval without evidence rejected',client.request('/api/agent-tasks/review',{'id':tid,'decision':'approve'})[0]==400)
+        check('Script-scheme evidence link rejected',client.request('/api/agent-tasks/evidence',{'id':tid,'label':'x','url':'javascript:alert(1)'})[0]==400)
+        check('Evidence recorded',client.request('/api/agent-tasks/evidence',{'id':tid,'label':'QA output','url':'https://example.com/qa'})[0]==201)
+        check('Approval with evidence completes the task',client.request('/api/agent-tasks/review',{'id':tid,'decision':'approve'})[0]==200)
+        check('Agent task history readable',len(client.request('/api/agent-tasks/'+tid)[1]['history'])>=5)
+        check('Status cannot be smuggled into task creation',client.request('/api/agent-tasks',{'title':'QA smuggle — synthetic','status':'completed'})[0]==400)
+        link={'id':tid,'provider':'clickup','scope':'qa-workspace','context':'qa-list','external_id':'qa-1'}
+        check('External reference recorded',client.request('/api/agent-tasks/link',link)[0]==201)
+        check('Same external record cannot be linked twice',client.request('/api/agent-tasks/link',{**link,'id':client.request('/api/agent-tasks',{'title':'QA second — synthetic'})[1]['id']})[0]==409)
+        check('Session identifier validated',client.request('/api/agent-tasks/session',{'id':tid,'agent_id':'claude','session_ref':'not valid!'})[0]==400 and client.request('/api/agent-tasks/session',{'id':tid,'agent_id':'claude','session_ref':'qa-session-1'})[0]==201)
+        check('Export includes agent tasks and no CSRF',any(t['id']==tid for t in client.request('/api/export')[1]['agent_tasks']) and 'csrf' not in client.request('/api/export')[1])
         # Restart the isolated app only; never restart the user's Hermes gateway.
         process.terminate();process.wait(timeout=10);process=start();client=Client();state=client.bootstrap()
         check('Capture survives server restart',any(c['id']==rid and c['status']=='inbox' for c in state['captures']))
+        check('Agent task survives server restart',any(t['id']==tid and t['status']=='completed' for t in state['agent_tasks']))
         with sync_playwright() as p:
             browser=p.chromium.launch(headless=True)
             context=browser.new_context(viewport={'width':1440,'height':1000})
             page=context.new_page(); errors=[];page.on('pageerror',lambda err:errors.append(str(err)))
             page.goto(BASE);page.wait_for_function("document.querySelector('#server-status').textContent.includes('connected')")
-            for view in ['today','captures','knowledge','activity','connections']:
+            for view in ['today','captures','agents','knowledge','activity','connections']:
                 page.locator(f'[data-view="{view}"]').click()
                 check('View renders: '+view,page.locator(f'[data-page="{view}"]').is_visible())
             page.locator('[data-view="captures"]').click();page.locator('#capture-add').click()
@@ -117,6 +142,9 @@ with tempfile.TemporaryDirectory(prefix='keystal-test-',dir=os.environ.get('TMPD
             check('Desktop has no horizontal overflow',page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
             page.set_viewport_size({'width':390,'height':844})
             check('Mobile has no horizontal overflow',page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+            page.locator('[data-view="agents"]').click()
+            check('Agents view has no horizontal overflow on mobile',page.evaluate('document.documentElement.scrollWidth <= innerWidth'))
+            page.locator('[data-view="today"]').click()
             page.locator('#open-capture').click();check('Capture dialog fits mobile',page.locator('#capture-dialog').bounding_box()['width']<=390)
             page.locator('[data-close="capture-dialog"]').click()
             check('No browser JS errors',not errors)
