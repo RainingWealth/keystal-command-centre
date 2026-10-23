@@ -29,6 +29,18 @@ SOURCE_LABELS = {'observed': 'observed', 'manual': 'manual', 'agent_reported': '
 PRIORITIES = ('low', 'normal', 'high', 'urgent')
 LANES = ('Sell', 'Serve', 'Operate', 'Build', 'Personal')
 SENSITIVE = re.compile(r'\b[STFGM]\d{7}[A-Z]\b', re.I)
+
+
+def has_identifier(value):
+    """A personal identification number in the text, also when it is percent-encoded (once or repeatedly) in a URL."""
+    for _ in range(5):
+        if SENSITIVE.search(value):
+            return True
+        decoded = unquote(value)
+        if decoded == value:
+            return False
+        value = decoded
+    return True  # still decoding after five rounds: refuse rather than guess
 TASK_ID = re.compile(r'[0-9a-f]{32}')
 BOARD = re.compile(r'[a-z0-9][a-z0-9_-]{0,63}')
 # Raw Hermes board state -> (our status or None, explicit state class). Raw states are always kept
@@ -95,9 +107,7 @@ def field(data, key, maximum, default='', required=False):
     if not isinstance(value, str):
         raise ApiError('Invalid ' + key)
     value = value.strip()
-    if SENSITIVE.search(unquote(value)):
-        raise ApiError('Remove personal identification numbers. Use [CLIENT].')
-    if SENSITIVE.search(value):
+    if has_identifier(value):
         raise ApiError('Remove personal identification numbers. Use [CLIENT].')
     if len(value) > maximum:
         raise ApiError(f'{key} is too long (max {maximum} characters)')
@@ -140,7 +150,7 @@ def evidence_url(value):
     if not isinstance(value, str) or len(value.strip()) > 500:
         raise ApiError('Invalid evidence link')
     value = value.strip()
-    if SENSITIVE.search(value):
+    if has_identifier(value):
         raise ApiError('Remove personal identification numbers. Use [CLIENT].')
     parts = urlsplit(value)
     if parts.scheme not in ('http', 'https') or not parts.hostname or '@' in parts.netloc or re.search(r'[\s\x00-\x1f\x7f<>"\']', value):

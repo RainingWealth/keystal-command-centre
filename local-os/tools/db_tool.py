@@ -383,15 +383,19 @@ def cmd_restore(args):
     db, backup = Path(args.db).resolve(), Path(args.backup).resolve()
     if not backup.is_file():
         return {'database': str(db), 'backup': str(backup), 'problems': ['backup does not exist'], 'result': 'No such backup; nothing was changed.', 'executed': False}, 3
-    if db == backup or os.path.samefile(db, backup):
+    if db == backup or (db.exists() and os.path.samefile(db, backup)):  # a missing destination is a normal restore target
         return {'database': str(db), 'backup': str(backup), 'problems': ['backup and database are the same file'], 'refused': 'Backup and database are the same file.', 'executed': False}, 3
     scratch = Path(tempfile.mkdtemp(prefix='keystal-restore-'))
     os.chmod(scratch, 0o700)
     try:
         check = scratch / 'check.sqlite3'
-        expected, version = online_backup(backup, check)
+        try:
+            expected, version = online_backup(backup, check)
+        except sqlite3.DatabaseError as exc:
+            return {'database': str(db), 'backup': str(backup), 'problems': [f'backup cannot be read: {exc}'],
+                    'refused': 'The backup failed verification; nothing was changed.', 'executed': False}, 3
         verified, problems = verify_copy(check, expected, version)
-    if not expected or not (set(expected) & {'captures','threads','messages','runs','events','meta','agents','agent_tasks','projects'}):
+        if not expected or not (set(expected) & {'captures','threads','messages','runs','events','meta','agents','agent_tasks','projects'}):
             problems.append('backup is empty or not a Keystal database')
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
@@ -410,6 +414,7 @@ def cmd_restore(args):
         return report, 3
     lock_fd = None
     if args.execute:
+        db.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         lock_fd = data_lock(db)
         if lock_fd is None:
             report['refused'] = 'Another Keystal OS server is already using this data folder. Nothing was changed.'
@@ -417,6 +422,7 @@ def cmd_restore(args):
     if not args.execute:
         report['result'] = 'Dry run. Stop the server, then re-run with --execute. The current database is renamed (kept), never deleted.'
         return report, 0
+    replaced = False
     if db.exists():
         c = sqlite3.connect(db, timeout=0)
         try:
@@ -433,12 +439,22 @@ def cmd_restore(args):
             side = Path(str(db) + suffix)
             if side.exists():
                 side.rename(Path(str(moved) + suffix))
+        replaced = True
     try:
         expected, version = online_backup(backup, db)
-    except sqlite3.DatabaseError as exc:
-        if not db.exists() and moved.exists():
+    except Exception as exc:
+        # online_backup creates the destination file before copying: remove that partial copy, then put the original back.
+        for suffix in ('', '-journal'):
+            Path(str(db) + suffix).unlink(missing_ok=True)
+        if replaced:
             moved.rename(db)
-        report.update(refused=f'Restore failed before installation: {exc}; the live database was kept.', result='Nothing was changed.')
+            for suffix in ('-journal', '-wal', '-shm'):
+                side = Path(str(moved) + suffix)
+                if side.exists():
+                    side.rename(Path(str(db) + suffix))
+        report.update(executed=False, problems=problems + [f'restore failed: {type(exc).__name__}: {exc}'],
+                      refused=f'Restore failed: {exc}.', replaced_file_kept=None,
+                      result='The original database was put back unchanged.' if replaced else 'No database was installed; the destination is as it was.')
         if lock_fd is not None: os.close(lock_fd)
         return report, 3
     verified, problems = verify_copy(db, expected, version)
@@ -470,7 +486,16 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         for path in (getattr(args, 'db', None), getattr(args, 'backup', None)):
-            if path and Path(path).is_file() and migrations.needs_recovery(path):
+            try:
+                hot = bool(path) and Path(path).is_file() and migrations.needs_recovery(path)
+            except sqlite3.DatabaseError as exc:  # not a readable database (busy or locked is reported below as STOPPED)
+                if isinstance(exc, sqlite3.OperationalError):
+                    raise
+                message = f'{Path(path).name} cannot be read as a SQLite database ({exc}); nothing was changed.'
+                print(json.dumps({'database': str(Path(path).resolve()), 'problems': [f'cannot be read: {exc}'], 'executed': False,
+                                  'refused': message, 'result': message}, indent=2))
+                return 3
+            if hot:
                 raise NeedsRecovery(str(Path(path).resolve()))
         report, code = {'inspect': cmd_inspect, 'backup': cmd_backup, 'restore-test': cmd_restore_test, 'migrate-check': cmd_migrate_check, 'quarantine': cmd_quarantine, 'restore': cmd_restore}[args.cmd](args)
     except SystemExit as exc:

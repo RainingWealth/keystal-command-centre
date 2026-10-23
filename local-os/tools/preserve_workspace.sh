@@ -13,8 +13,14 @@ ROOT="${2:-$HOME/Keystal/backups}"
 [ -d "$SRC" ] || { echo "No such directory: $SRC" >&2; exit 2; }
 git -C "$SRC" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "Not a git workspace: $SRC" >&2; exit 2; }
 SRC="$(cd "$SRC" && pwd -P)"
-case "$ROOT" in "$SRC"|"$SRC"/*) echo "Backup root is inside source workspace; refusing." >&2; exit 2;; esac
-ROOT="$(mkdir -p "$ROOT" && cd "$ROOT" && pwd -P)"
+# Resolve ROOT to an absolute physical path WITHOUT creating anything, so the inside-the-source check sees the real
+# location (relative roots, '..' and symlinks included) before a single directory is made.
+case "$ROOT" in /*) ;; *) ROOT="$PWD/$ROOT";; esac
+BASE="$ROOT"; REST=""
+while [ ! -d "$BASE" ]; do REST="/$(basename "$BASE")$REST"; BASE="$(dirname "$BASE")"; done
+ROOT="$(cd "$BASE" && pwd -P)$REST"
+case "$ROOT" in "$SRC"|"$SRC"/*) echo "Backup root is inside the source workspace; refusing: $ROOT" >&2; exit 2;; esac
+mkdir -p "$ROOT"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 DEST="$ROOT/$(basename "$SRC")-$STAMP"
 [ ! -e "$DEST" ] || { echo "Destination exists, refusing: $DEST" >&2; exit 2; }

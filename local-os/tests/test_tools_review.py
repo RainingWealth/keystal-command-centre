@@ -79,6 +79,35 @@ class DatabaseToolReview(unittest.TestCase):
         self.assertEqual(code, 3, report)
         self.assertTrue(self.db.exists(), report)
         self.assertEqual(self.db.read_bytes(), before)
+        self.assertFalse(report['executed'], report)
+        self.assertIn('put back unchanged', report['result'])
+        self.assertEqual(sorted(p.name for p in self.root.iterdir() if 'replaced' in p.name), [], 'no stray kept file: the original is back in place')
+
+    def test_restore_into_a_destination_that_does_not_exist_yet(self):
+        for folder in ('fresh', 'fresh/nested'):
+            with self.subTest(folder=folder):
+                target = self.root / folder / 'workbench.sqlite3'
+                code, report = run('restore', '--backup', str(self.backup), '--db', str(target))
+                self.assertEqual((code, report['executed'], report['would_rename_current_to']), (0, False, None), report)
+                self.assertFalse(target.exists(), 'a dry run creates nothing')
+                code, report = run('restore', '--backup', str(self.backup), '--db', str(target), '--execute')
+                self.assertEqual((code, report['executed'], report['problems']), (0, True, []), report)
+                self.assertEqual(fixtures.dump(target), fixtures.dump(self.backup))
+                self.assertIsNone(report['replaced_file_kept'])
+
+    def test_a_failed_restore_into_a_missing_destination_leaves_nothing_behind(self):
+        target = self.root / 'fresh' / 'workbench.sqlite3'
+        original = db_tool.online_backup
+        def fail_at_destination(source, destination):
+            if Path(destination) == target:
+                os.close(os.open(destination, os.O_CREAT | os.O_WRONLY, 0o600))  # the real copy creates the file first
+                raise sqlite3.OperationalError('synthetic full destination disk')
+            return original(source, destination)
+        with mock.patch.object(db_tool, 'online_backup', side_effect=fail_at_destination):
+            code, report = run('restore', '--backup', str(self.backup), '--db', str(target), '--execute')
+        self.assertEqual((code, report['executed']), (3, False), report)
+        self.assertIn('No database was installed', report['result'])
+        self.assertFalse(target.exists(), 'no empty file left where the server would open it as a new database')
 
     def test_25_same_file_and_alias_backup_are_refused_during_dry_run(self):
         alias = self.root / 'alias.sqlite3'
@@ -200,6 +229,14 @@ class PreserveWorkspaceReview(unittest.TestCase):
         self.assertTrue((destination / 'repo.bundle').is_file())
         listing = subprocess.run(['tar', '-tzf', str(destination / 'untracked.tgz')], capture_output=True, text=True, check=True)
         self.assertIn('untracked file', listing.stdout)
+
+    def test_relative_backup_root_inside_the_source_is_refused_before_anything_is_created(self):
+        for root in ('backups', './x/../backups', '../workspace/backups'):
+            with self.subTest(root=root):
+                result = subprocess.run([str(TOOLS / 'preserve_workspace.sh'), '.', root], cwd=self.ws, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn('inside the source workspace', result.stderr)
+                self.assertEqual(self.git('status', '--porcelain', '--ignored').stdout, '', 'nothing was created in the source')
 
     def test_30_bundle_failure_is_reported_as_failure_not_an_empty_repository(self):
         old_blob = self.git('rev-parse', 'HEAD:one').stdout.strip()

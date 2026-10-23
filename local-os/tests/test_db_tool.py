@@ -78,8 +78,9 @@ class Inspect(ToolCase):
         self.assertIn('no approval and evidence', report['warnings'][0])
 
     def test_missing_database_is_an_error_not_a_new_file(self):
-        with self.assertRaises(SystemExit):
-            run('inspect', '--db', str(self.dir / 'nope.sqlite3'))
+        code, report = run('inspect', '--db', str(self.dir / 'nope.sqlite3'))
+        self.assertEqual(code, 3, report)
+        self.assertIn('No such database', report['result'])
         self.assertFalse((self.dir / 'nope.sqlite3').exists())
 
 
@@ -402,11 +403,9 @@ class Restore(ToolCase):
             data[i] ^= 0xFF
         backup.write_bytes(bytes(data))
         before = file_hash(self.db)
-        try:
-            code, report = run('restore', '--backup', str(backup), '--db', str(self.db), '--execute')
-        except sqlite3.DatabaseError:
-            code, report = 3, {'executed': False}
-        self.assertEqual((code, report['executed']), (3, False))
+        code, report = run('restore', '--backup', str(backup), '--db', str(self.db), '--execute')
+        self.assertEqual((code, report['executed']), (3, False), report)
+        self.assertIn('nothing was changed', report['refused'])
         self.assertEqual(file_hash(self.db), before)
 
 
