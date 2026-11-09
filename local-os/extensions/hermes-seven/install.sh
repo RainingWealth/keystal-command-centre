@@ -18,8 +18,18 @@ HELP
 }
 check_hermes() {
   command -v hermes >/dev/null 2>&1 || { echo "Hermes CLI not found. Run this on Keystal's Mac." >&2; exit 2; }
-  hermes --version
-  echo "Full pack requires Hermes >=0.22.5; check version above before proceeding."
+  version_text="$(hermes --version)"
+  echo "$version_text"
+  version="$(printf '%s\n' "$version_text" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)"
+  if [ -z "$version" ]; then
+    echo "Cannot verify Hermes version; no changes made." >&2
+    exit 3
+  fi
+  IFS='.' read -r major minor patch <<< "$version"
+  if (( major == 0 && (minor < 22 || (minor == 22 && patch < 5)) )); then
+    echo "Hermes >=0.22.5 required; check 'hermes update --check' before installing." >&2
+    exit 3
+  fi
 }
 backup_config() {
   umask 077
