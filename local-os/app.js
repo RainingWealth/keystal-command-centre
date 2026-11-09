@@ -17,7 +17,7 @@ function setView(view) {
   if (!$(`[data-page="${view}"]`)) view = 'today';
   $$('[data-page]').forEach(x => x.hidden = x.dataset.page !== view);
   $$('.nav').forEach(x => x.classList.toggle('active', x.dataset.view === view));
-  $('#page-name').textContent = ({today:'Today', captures:'Capture inbox', knowledge:'Knowledge', activity:'Activity', connections:'Connections'})[view];
+  $('#page-name').textContent = ({today:'Today', captures:'Capture inbox', knowledge:'Knowledge', activity:'Activity', connections:'Connections', toolkit:'Hermes Toolkit'})[view];
   localStorage.setItem('keystal.view', view);
 }
 function openCapture(lane = 'Sell') {
