@@ -1,0 +1,106 @@
+{
+ "zf_xiaoyi": {
+  "spec": "zf_xiaoyi",
+  "dur": 10.13,
+  "wpm": 189,
+  "wer": 0.031,
+  "conf": 0.944,
+  "f0": 289
+ },
+ "zf_xiaoxiao": {
+  "spec": "zf_xiaoxiao",
+  "dur": 10.79,
+  "wpm": 178,
+  "wer": 0.062,
+  "conf": 0.924,
+  "f0": 226
+ },
+ "zf_xiaobei": {
+  "spec": "zf_xiaobei",
+  "dur": 12.38,
+  "wpm": 155,
+  "wer": 0.0,
+  "conf": 0.932,
+  "f0": 226
+ },
+ "zf_xiaoni": {
+  "spec": "zf_xiaoni",
+  "dur": 10.77,
+  "wpm": 178,
+  "wer": 0.062,
+  "conf": 0.915,
+  "f0": 230
+ },
+ "hf_alpha": {
+  "spec": "hf_alpha",
+  "dur": 12.68,
+  "wpm": 151,
+  "wer": 0.0,
+  "conf": 0.953,
+  "f0": 200
+ },
+ "hf_beta": {
+  "spec": "hf_beta",
+  "dur": 11.86,
+  "wpm": 162,
+  "wer": 0.0,
+  "conf": 0.952,
+  "f0": 180
+ },
+ "xiaoyi70_heart30": {
+  "spec": "zf_xiaoyi:0.7,af_heart:0.3",
+  "dur": 11.06,
+  "wpm": 174,
+  "wer": 0.0,
+  "conf": 0.94,
+  "f0": 264
+ },
+ "xiaoxiao70_heart30": {
+  "spec": "zf_xiaoxiao:0.7,af_heart:0.3",
+  "dur": 11.36,
+  "wpm": 169,
+  "wer": 0.031,
+  "conf": 0.935,
+  "f0": 214
+ },
+ "xiaoyi50_heart50": {
+  "spec": "zf_xiaoyi:0.5,af_heart:0.5",
+  "dur": 11.61,
+  "wpm": 165,
+  "wer": 0.0,
+  "conf": 0.952,
+  "f0": 245
+ },
+ "xiaoxiao50_heart50": {
+  "spec": "zf_xiaoxiao:0.5,af_heart:0.5",
+  "dur": 11.86,
+  "wpm": 162,
+  "wer": 0.0,
+  "conf": 0.961,
+  "f0": 211
+ },
+ "alpha70_heart30": {
+  "spec": "hf_alpha:0.7,af_heart:0.3",
+  "dur": 12.74,
+  "wpm": 151,
+  "wer": 0.0,
+  "conf": 0.961,
+  "f0": 202
+ },
+ "beta70_heart30": {
+  "spec": "hf_beta:0.7,af_heart:0.3",
+  "dur": 12.13,
+  "wpm": 158,
+  "wer": 0.0,
+  "conf": 0.957,
+  "f0": 188
+ },
+ "af_heart_ref": {
+  "spec": "af_heart",
+  "dur": 12.8,
+  "wpm": 150,
+  "wer": 0.0,
+  "conf": 0.949,
+  "f0": 202
+ }
+}
