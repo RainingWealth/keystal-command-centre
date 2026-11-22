@@ -1,0 +1,968 @@
+{
+ "voice": "af_heart",
+ "speed": 0.92,
+ "sampleRate": 24000,
+ "scenes": {
+  "s1": {
+   "durationMs": 5293,
+   "words": [
+    {
+     "i": 0,
+     "spoken": "You",
+     "display": "You",
+     "startMs": 14,
+     "endMs": 152
+    },
+    {
+     "i": 1,
+     "spoken": "built",
+     "display": "built",
+     "startMs": 152,
+     "endMs": 439
+    },
+    {
+     "i": 2,
+     "spoken": "this",
+     "display": "this",
+     "startMs": 439,
+     "endMs": 639
+    },
+    {
+     "i": 3,
+     "spoken": "business",
+     "display": "business",
+     "startMs": 639,
+     "endMs": 1089
+    },
+    {
+     "i": 4,
+     "spoken": "with",
+     "display": "with",
+     "startMs": 1089,
+     "endMs": 1227
+    },
+    {
+     "i": 5,
+     "spoken": "a",
+     "display": "a",
+     "startMs": 1227,
+     "endMs": 1289
+    },
+    {
+     "i": 6,
+     "spoken": "partner.",
+     "display": "partner.",
+     "startMs": 1289,
+     "endMs": 2039
+    },
+    {
+     "i": 7,
+     "spoken": "But",
+     "display": "But",
+     "startMs": 2039,
+     "endMs": 2177
+    },
+    {
+     "i": 8,
+     "spoken": "if",
+     "display": "if",
+     "startMs": 2177,
+     "endMs": 2289
+    },
+    {
+     "i": 9,
+     "spoken": "they",
+     "display": "they",
+     "startMs": 2289,
+     "endMs": 2489
+    },
+    {
+     "i": 10,
+     "spoken": "suddenly",
+     "display": "suddenly",
+     "startMs": 2489,
+     "endMs": 2864
+    },
+    {
+     "i": 11,
+     "spoken": "passed",
+     "display": "passed",
+     "startMs": 2864,
+     "endMs": 3189
+    },
+    {
+     "i": 12,
+     "spoken": "away...",
+     "display": "away...",
+     "startMs": 3189,
+     "endMs": 3939
+    },
+    {
+     "i": 13,
+     "spoken": "who",
+     "display": "who",
+     "startMs": 3939,
+     "endMs": 4052
+    },
+    {
+     "i": 14,
+     "spoken": "would",
+     "display": "would",
+     "startMs": 4052,
+     "endMs": 4164
+    },
+    {
+     "i": 15,
+     "spoken": "own",
+     "display": "own",
+     "startMs": 4164,
+     "endMs": 4389
+    },
+    {
+     "i": 16,
+     "spoken": "their",
+     "display": "their",
+     "startMs": 4389,
+     "endMs": 4577
+    },
+    {
+     "i": 17,
+     "spoken": "shares?",
+     "display": "shares?",
+     "startMs": 4577,
+     "endMs": 5539
+    }
+   ]
+  },
+  "s2": {
+   "durationMs": 9777,
+   "words": [
+    {
+     "i": 0,
+     "spoken": "Their",
+     "display": "Their",
+     "startMs": 14,
+     "endMs": 239
+    },
+    {
+     "i": 1,
+     "spoken": "shares",
+     "display": "shares",
+     "startMs": 239,
+     "endMs": 664
+    },
+    {
+     "i": 2,
+     "spoken": "may",
+     "display": "may",
+     "startMs": 664,
+     "endMs": 852
+    },
+    {
+     "i": 3,
+     "spoken": "pass",
+     "display": "pass",
+     "startMs": 852,
+     "endMs": 1239
+    },
+    {
+     "i": 4,
+     "spoken": "to",
+     "display": "to",
+     "startMs": 1239,
+     "endMs": 1327
+    },
+    {
+     "i": 5,
+     "spoken": "their",
+     "display": "their",
+     "startMs": 1327,
+     "endMs": 1514
+    },
+    {
+     "i": 6,
+     "spoken": "estate.",
+     "display": "estate.",
+     "startMs": 1514,
+     "endMs": 2489
+    },
+    {
+     "i": 7,
+     "spoken": "You",
+     "display": "You",
+     "startMs": 2489,
+     "endMs": 2614
+    },
+    {
+     "i": 8,
+     "spoken": "could",
+     "display": "could",
+     "startMs": 2614,
+     "endMs": 2764
+    },
+    {
+     "i": 9,
+     "spoken": "end",
+     "display": "end",
+     "startMs": 2764,
+     "endMs": 2977
+    },
+    {
+     "i": 10,
+     "spoken": "up",
+     "display": "up",
+     "startMs": 2977,
+     "endMs": 3189
+    },
+    {
+     "i": 11,
+     "spoken": "sharing",
+     "display": "sharing",
+     "startMs": 3189,
+     "endMs": 3602
+    },
+    {
+     "i": 12,
+     "spoken": "ownership",
+     "display": "ownership",
+     "startMs": 3602,
+     "endMs": 4164
+    },
+    {
+     "i": 13,
+     "spoken": "with",
+     "display": "with",
+     "startMs": 4164,
+     "endMs": 4339
+    },
+    {
+     "i": 14,
+     "spoken": "people",
+     "display": "people",
+     "startMs": 4339,
+     "endMs": 4714
+    },
+    {
+     "i": 15,
+     "spoken": "who",
+     "display": "who",
+     "startMs": 4714,
+     "endMs": 4864
+    },
+    {
+     "i": 16,
+     "spoken": "never",
+     "display": "never",
+     "startMs": 4864,
+     "endMs": 5177
+    },
+    {
+     "i": 17,
+     "spoken": "planned",
+     "display": "planned",
+     "startMs": 5177,
+     "endMs": 5564
+    },
+    {
+     "i": 18,
+     "spoken": "to",
+     "display": "to",
+     "startMs": 5564,
+     "endMs": 5652
+    },
+    {
+     "i": 19,
+     "spoken": "be",
+     "display": "be",
+     "startMs": 5652,
+     "endMs": 5789
+    },
+    {
+     "i": 20,
+     "spoken": "involved.",
+     "display": "involved.",
+     "startMs": 5789,
+     "endMs": 6889
+    },
+    {
+     "i": 21,
+     "spoken": "And",
+     "display": "And",
+     "startMs": 6889,
+     "endMs": 7027
+    },
+    {
+     "i": 22,
+     "spoken": "their",
+     "display": "their",
+     "startMs": 7027,
+     "endMs": 7202
+    },
+    {
+     "i": 23,
+     "spoken": "family",
+     "display": "family",
+     "startMs": 7202,
+     "endMs": 7714
+    },
+    {
+     "i": 24,
+     "spoken": "may",
+     "display": "may",
+     "startMs": 7714,
+     "endMs": 7889
+    },
+    {
+     "i": 25,
+     "spoken": "need",
+     "display": "need",
+     "startMs": 7889,
+     "endMs": 8127
+    },
+    {
+     "i": 26,
+     "spoken": "cash,",
+     "display": "cash,",
+     "startMs": 8127,
+     "endMs": 8814
+    },
+    {
+     "i": 27,
+     "spoken": "not",
+     "display": "not",
+     "startMs": 8814,
+     "endMs": 9077
+    },
+    {
+     "i": 28,
+     "spoken": "shares.",
+     "display": "shares.",
+     "startMs": 9077,
+     "endMs": 10039
+    }
+   ]
+  },
+  "s3": {
+   "durationMs": 8895,
+   "words": [
+    {
+     "i": 0,
+     "spoken": "A",
+     "display": "A",
+     "startMs": 15,
+     "endMs": 103
+    },
+    {
+     "i": 1,
+     "spoken": "buy-sell",
+     "display": "buy-sell",
+     "startMs": 103,
+     "endMs": 615
+    },
+    {
+     "i": 2,
+     "spoken": "agreement",
+     "display": "agreement",
+     "startMs": 615,
+     "endMs": 1140
+    },
+    {
+     "i": 3,
+     "spoken": "sets",
+     "display": "sets",
+     "startMs": 1140,
+     "endMs": 1440
+    },
+    {
+     "i": 4,
+     "spoken": "out",
+     "display": "out",
+     "startMs": 1440,
+     "endMs": 1665
+    },
+    {
+     "i": 5,
+     "spoken": "what",
+     "display": "what",
+     "startMs": 1665,
+     "endMs": 1815
+    },
+    {
+     "i": 6,
+     "spoken": "happens",
+     "display": "happens",
+     "startMs": 1815,
+     "endMs": 2303
+    },
+    {
+     "i": 7,
+     "spoken": "when",
+     "display": "when",
+     "startMs": 2303,
+     "endMs": 2428
+    },
+    {
+     "i": 8,
+     "spoken": "a",
+     "display": "a",
+     "startMs": 2428,
+     "endMs": 2490
+    },
+    {
+     "i": 9,
+     "spoken": "specific",
+     "display": "specific",
+     "startMs": 2490,
+     "endMs": 3015
+    },
+    {
+     "i": 10,
+     "spoken": "event",
+     "display": "event",
+     "startMs": 3015,
+     "endMs": 3290
+    },
+    {
+     "i": 11,
+     "spoken": "occurs:",
+     "display": "occurs:",
+     "startMs": 3290,
+     "endMs": 4428
+    },
+    {
+     "i": 12,
+     "spoken": "who",
+     "display": "who",
+     "startMs": 4428,
+     "endMs": 4590
+    },
+    {
+     "i": 13,
+     "spoken": "can",
+     "display": "can",
+     "startMs": 4590,
+     "endMs": 4765
+    },
+    {
+     "i": 14,
+     "spoken": "buy",
+     "display": "buy",
+     "startMs": 4765,
+     "endMs": 4990
+    },
+    {
+     "i": 15,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 4990,
+     "endMs": 5140
+    },
+    {
+     "i": 16,
+     "spoken": "shares,",
+     "display": "shares,",
+     "startMs": 5140,
+     "endMs": 5965
+    },
+    {
+     "i": 17,
+     "spoken": "how",
+     "display": "how",
+     "startMs": 5965,
+     "endMs": 6128
+    },
+    {
+     "i": 18,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 6128,
+     "endMs": 6215
+    },
+    {
+     "i": 19,
+     "spoken": "price",
+     "display": "price",
+     "startMs": 6215,
+     "endMs": 6565
+    },
+    {
+     "i": 20,
+     "spoken": "is",
+     "display": "is",
+     "startMs": 6565,
+     "endMs": 6703
+    },
+    {
+     "i": 21,
+     "spoken": "set,",
+     "display": "set,",
+     "startMs": 6703,
+     "endMs": 7353
+    },
+    {
+     "i": 22,
+     "spoken": "and",
+     "display": "and",
+     "startMs": 7353,
+     "endMs": 7478
+    },
+    {
+     "i": 23,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 7478,
+     "endMs": 7578
+    },
+    {
+     "i": 24,
+     "spoken": "terms",
+     "display": "terms",
+     "startMs": 7578,
+     "endMs": 7978
+    },
+    {
+     "i": 25,
+     "spoken": "of",
+     "display": "of",
+     "startMs": 7978,
+     "endMs": 8053
+    },
+    {
+     "i": 26,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 8053,
+     "endMs": 8140
+    },
+    {
+     "i": 27,
+     "spoken": "transfer.",
+     "display": "transfer.",
+     "startMs": 8140,
+     "endMs": 9190
+    }
+   ]
+  },
+  "s4": {
+   "durationMs": 5702,
+   "words": [
+    {
+     "i": 0,
+     "spoken": "But",
+     "display": "But",
+     "startMs": 0,
+     "endMs": 118
+    },
+    {
+     "i": 1,
+     "spoken": "here's",
+     "display": "here's",
+     "startMs": 118,
+     "endMs": 481
+    },
+    {
+     "i": 2,
+     "spoken": "what",
+     "display": "what",
+     "startMs": 481,
+     "endMs": 706
+    },
+    {
+     "i": 3,
+     "spoken": "many",
+     "display": "many",
+     "startMs": 706,
+     "endMs": 968
+    },
+    {
+     "i": 4,
+     "spoken": "business",
+     "display": "business",
+     "startMs": 968,
+     "endMs": 1381
+    },
+    {
+     "i": 5,
+     "spoken": "owners",
+     "display": "owners",
+     "startMs": 1381,
+     "endMs": 1781
+    },
+    {
+     "i": 6,
+     "spoken": "overlook:",
+     "display": "overlook:",
+     "startMs": 1781,
+     "endMs": 2868
+    },
+    {
+     "i": 7,
+     "spoken": "an",
+     "display": "an",
+     "startMs": 2868,
+     "endMs": 3006
+    },
+    {
+     "i": 8,
+     "spoken": "agreement",
+     "display": "agreement",
+     "startMs": 3006,
+     "endMs": 3481
+    },
+    {
+     "i": 9,
+     "spoken": "doesn't",
+     "display": "doesn't",
+     "startMs": 3481,
+     "endMs": 3756
+    },
+    {
+     "i": 10,
+     "spoken": "give",
+     "display": "give",
+     "startMs": 3756,
+     "endMs": 3918
+    },
+    {
+     "i": 11,
+     "spoken": "you",
+     "display": "you",
+     "startMs": 3918,
+     "endMs": 3993
+    },
+    {
+     "i": 12,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 3993,
+     "endMs": 4118
+    },
+    {
+     "i": 13,
+     "spoken": "cash",
+     "display": "cash",
+     "startMs": 4118,
+     "endMs": 4531
+    },
+    {
+     "i": 14,
+     "spoken": "to",
+     "display": "to",
+     "startMs": 4531,
+     "endMs": 4631
+    },
+    {
+     "i": 15,
+     "spoken": "buy",
+     "display": "buy",
+     "startMs": 4631,
+     "endMs": 4856
+    },
+    {
+     "i": 16,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 4856,
+     "endMs": 4993
+    },
+    {
+     "i": 17,
+     "spoken": "shares.",
+     "display": "shares.",
+     "startMs": 4993,
+     "endMs": 5956
+    }
+   ]
+  },
+  "s5": {
+   "durationMs": 8524,
+   "words": [
+    {
+     "i": 0,
+     "spoken": "Properly",
+     "display": "Properly",
+     "startMs": 0,
+     "endMs": 490
+    },
+    {
+     "i": 1,
+     "spoken": "structured",
+     "display": "structured",
+     "startMs": 490,
+     "endMs": 1040
+    },
+    {
+     "i": 2,
+     "spoken": "insurance",
+     "display": "insurance",
+     "startMs": 1040,
+     "endMs": 1690
+    },
+    {
+     "i": 3,
+     "spoken": "can",
+     "display": "can",
+     "startMs": 1690,
+     "endMs": 1840
+    },
+    {
+     "i": 4,
+     "spoken": "help",
+     "display": "help",
+     "startMs": 1840,
+     "endMs": 2115
+    },
+    {
+     "i": 5,
+     "spoken": "fund",
+     "display": "fund",
+     "startMs": 2115,
+     "endMs": 2328
+    },
+    {
+     "i": 6,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 2328,
+     "endMs": 2415
+    },
+    {
+     "i": 7,
+     "spoken": "buyout,",
+     "display": "buyout,",
+     "startMs": 2415,
+     "endMs": 3328
+    },
+    {
+     "i": 8,
+     "spoken": "subject",
+     "display": "subject",
+     "startMs": 3328,
+     "endMs": 3815
+    },
+    {
+     "i": 9,
+     "spoken": "to",
+     "display": "to",
+     "startMs": 3815,
+     "endMs": 3915
+    },
+    {
+     "i": 10,
+     "spoken": "policy",
+     "display": "policy",
+     "startMs": 3915,
+     "endMs": 4340
+    },
+    {
+     "i": 11,
+     "spoken": "terms,",
+     "display": "terms,",
+     "startMs": 4340,
+     "endMs": 5078
+    },
+    {
+     "i": 12,
+     "spoken": "claims",
+     "display": "claims",
+     "startMs": 5078,
+     "endMs": 5490
+    },
+    {
+     "i": 13,
+     "spoken": "requirements,",
+     "display": "requirements,",
+     "startMs": 5490,
+     "endMs": 6665
+    },
+    {
+     "i": 14,
+     "spoken": "and",
+     "display": "and",
+     "startMs": 6665,
+     "endMs": 6790
+    },
+    {
+     "i": 15,
+     "spoken": "how",
+     "display": "how",
+     "startMs": 6790,
+     "endMs": 6978
+    },
+    {
+     "i": 16,
+     "spoken": "the",
+     "display": "the",
+     "startMs": 6978,
+     "endMs": 7115
+    },
+    {
+     "i": 17,
+     "spoken": "arrangement",
+     "display": "arrangement",
+     "startMs": 7115,
+     "endMs": 7790
+    },
+    {
+     "i": 18,
+     "spoken": "is",
+     "display": "is",
+     "startMs": 7790,
+     "endMs": 7928
+    },
+    {
+     "i": 19,
+     "spoken": "set",
+     "display": "set",
+     "startMs": 7928,
+     "endMs": 8128
+    },
+    {
+     "i": 20,
+     "spoken": "up.",
+     "display": "up.",
+     "startMs": 8128,
+     "endMs": 8815
+    }
+   ]
+  },
+  "s6": {
+   "durationMs": 8223,
+   "words": [
+    {
+     "i": 0,
+     "spoken": "If",
+     "display": "If",
+     "startMs": 0,
+     "endMs": 161
+    },
+    {
+     "i": 1,
+     "spoken": "you",
+     "display": "you",
+     "startMs": 161,
+     "endMs": 349
+    },
+    {
+     "i": 2,
+     "spoken": "share",
+     "display": "share",
+     "startMs": 349,
+     "endMs": 636
+    },
+    {
+     "i": 3,
+     "spoken": "your",
+     "display": "your",
+     "startMs": 636,
+     "endMs": 786
+    },
+    {
+     "i": 4,
+     "spoken": "business",
+     "display": "business",
+     "startMs": 786,
+     "endMs": 1211
+    },
+    {
+     "i": 5,
+     "spoken": "with",
+     "display": "with",
+     "startMs": 1211,
+     "endMs": 1361
+    },
+    {
+     "i": 6,
+     "spoken": "other",
+     "display": "other",
+     "startMs": 1361,
+     "endMs": 1649
+    },
+    {
+     "i": 7,
+     "spoken": "shareholders,",
+     "display": "shareholders,",
+     "startMs": 1649,
+     "endMs": 2724
+    },
+    {
+     "i": 8,
+     "spoken": "don't",
+     "display": "don't",
+     "startMs": 2724,
+     "endMs": 3011
+    },
+    {
+     "i": 9,
+     "spoken": "leave",
+     "display": "leave",
+     "startMs": 3011,
+     "endMs": 3286
+    },
+    {
+     "i": 10,
+     "spoken": "succession",
+     "display": "succession",
+     "startMs": 3286,
+     "endMs": 3861
+    },
+    {
+     "i": 11,
+     "spoken": "to",
+     "display": "to",
+     "startMs": 3861,
+     "endMs": 3986
+    },
+    {
+     "i": 12,
+     "spoken": "chance.",
+     "display": "chance.",
+     "startMs": 3986,
+     "endMs": 5036
+    },
+    {
+     "i": 13,
+     "spoken": "Book",
+     "display": "Book",
+     "startMs": 5036,
+     "endMs": 5286
+    },
+    {
+     "i": 14,
+     "spoken": "a",
+     "display": "a",
+     "startMs": 5286,
+     "endMs": 5411
+    },
+    {
+     "i": 15,
+     "spoken": "fifteen-minute",
+     "display": "15-minute",
+     "startMs": 5411,
+     "endMs": 6236
+    },
+    {
+     "i": 16,
+     "spoken": "shareholder",
+     "display": "shareholder",
+     "startMs": 6236,
+     "endMs": 6899
+    },
+    {
+     "i": 17,
+     "spoken": "continuity",
+     "display": "continuity",
+     "startMs": 6899,
+     "endMs": 7611
+    },
+    {
+     "i": 18,
+     "spoken": "review.",
+     "display": "review.",
+     "startMs": 7611,
+     "endMs": 8486
+    }
+   ]
+  }
+ }
+}

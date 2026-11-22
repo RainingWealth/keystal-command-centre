@@ -10,3 +10,7 @@ __pycache__/
 local-state/
 outputs/
 .DS_Store
+
+# buy-sell-remotion
+buy-sell-remotion/node_modules/
+buy-sell-remotion/out/
