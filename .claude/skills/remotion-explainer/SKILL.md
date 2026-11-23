@@ -4,24 +4,19 @@ description: Build, render and QA a 9:16 financial-education explainer video (Si
 ---
 
 # Remotion explainer workflow
+Reference implementation: `keyman-remotion/` (SSIM 0.996 vs the Lemo-Opuscar original, render 48 s). Read `keyman-remotion/COMPARISON.md` and `/CLAUDE.md` first. Decision: Remotion renders; Opuscar's Kokoro TTS + Whisper timing + score tooling feed it.
 
-Reference implementation: `keyman-remotion/` (port of the Lemo-Opuscar Keyman film, SSIM 0.996 vs original, render 48 s).
-Read `keyman-remotion/COMPARISON.md` and `/CLAUDE.md` first.
+1. Script (~90 words) under `references/compliance.md` rules.
+2. Copy `keyman-remotion/` to `<topic>-remotion/`; keep `src/lib`, `src/design`, `src/components`, `FontGate`, `Captions`; replace `timeline.json`, `timing.ts`, scenes.
+3. Voice, timing, audio, render, QA: exact commands in `references/pipeline.md`.
+4. QA gate before claiming done: `scripts/qa.sh <video> [reference]` - frames = fps x duration, ~-14 LUFS, intended silences only, captions <= 2 lines inside x72-900 / y<=1380, view a contact sheet. State honestly that audio was not listened to.
 
-## Steps for a new topic
-1. **Script** (~90 words, 11-ish lines, 130-145 wpm). Compliance first: conditional wording ("can help", "depending on the policy", "if ... covered event"), no guarantees, no insurer names/logos/phones, fine print on CTA card: "General information only, not financial advice. Benefits depend on policy terms and conditions." Keyman tax: deduction is conditional (IRAS five conditions) - never say "always deductible".
-2. **Copy the project** to `<topic>-remotion/`; replace `src/data/timeline.json`, `timing.ts` constants, scene files. Keep `src/lib/anim.ts`, `design/tokens.ts`, `components/primitives.tsx`, `Captions.tsx`, `FontGate.tsx`.
-3. **Voice + timing**: Kokoro TTS (blend `zf_xiaoxiao:0.5,af_heart:0.5`, speed 0.82; phoneme override for "Keyman"), faster-whisper word times -> `timeline.json` (`lines[].wt`, `cues[]`). Lemo-Opuscar tools: `tools/tts_blend.py`, `tools/build_timeline.py` in the original (PR #4, `keyman-explainer-test/source`). Start each VO line on a 120 BPM quarter-beat (12 frames/beat at 24 fps); hold each caption >= max(1.8 s, speech+0.6 s).
-4. **Audio**: `tools/audio/` rebuilds bed (score+foley, ducked) and per-line VO stems; Remotion `Soundtrack.tsx` places them. Needs `LIB` (lemo-opuscar clone) and `ORIG`.
-5. **Scenes**: one pure function of absolute seconds `t` per scene; use `snap/rin/rout/steps/lin` only (ease cubic-bezier(.7,0,.2,1) + linear; no fades/bounce/gradients). Palette: bg #0B1220, panel #17243A, cyan #00D9E8 (single signal), orange #FF9A3C (risk only), Archivo.
-6. **Render**: `npm run render` (render -> two-pass loudnorm -14 LUFS/-1.5 TP -> trim `-t 52`).
-7. **QA (must pass before claiming done)**: ffprobe frames = fps*duration; ebur128 ~ -14; silencedetect shows intended silences; captions <=2 lines inside x72-900, y<=1380; SSIM vs reference frames; view contact sheet. Say honestly that audio was not listened to.
+## Gotchas
+- Use the source film's fps/size (24 fps), not a brief's fallback; real CTA text beats the brief's.
+- Clip with nested `<svg x y width height viewBox>` (no ids); `strokeMiterlimit=10` to match canvas.
+- Gate rendering on font load before measuring text; bed audio is longer than the video, so trim with `-t`.
+- Chrome: `remotion.config.ts` uses the pre-installed headless shell or `BROWSER_EXECUTABLE`; never reinstall.
+- Remotion needs a paid company licence for larger for-profit teams - check remotion.pro.
 
-## Gotchas learned
-- Use fps/size of the source film (24 fps), not the brief's fallback.
-- Clip with nested `<svg x y width height viewBox>` (no ids); set `strokeMiterlimit=10` to match canvas.
-- Gate rendering on font load (`FontGate`) before measuring text.
-- Bed audio is longer than video: trim output to duration.
-- Chrome: remotion.config.ts uses /opt/pw-browsers headless shell or `BROWSER_EXECUTABLE`; never reinstall.
-- Remotion licence: paid for larger for-profit teams; check remotion.pro.
-- Generalising the Keyman scenes into data-driven templates is NOT done yet; first new topic should build 3-4 reusable scene types (network, tower+shield, three-row split, CTA card).
+## Next step for the 20-topic series (not built yet)
+Build 4 reusable data-driven scene types from the Keyman scenes: network grid, tower + shield, three-row split, CTA card; then one `topic.json` per video (script, timeline, scene props).
