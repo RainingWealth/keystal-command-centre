@@ -1,0 +1,24 @@
+{
+  "name": "keyman-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Keyman insurance explainer — native Remotion recreation of the Lemo-Opuscar film (A/B test)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "audio": "sh tools/audio/build_audio.sh",
+    "still": "remotion still src/index.ts KeymanRemotion",
+    "render": "sh scripts/render.sh"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.545",
+    "@remotion/fonts": "4.0.545",
+    "@remotion/layout-utils": "4.0.545",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.545"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}
