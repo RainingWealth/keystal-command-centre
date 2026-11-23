@@ -1,0 +1,116 @@
+{
+  "title": "Buy-Sell Agreement Explainer",
+  "voice": "af_heart",
+  "speed": 0.92,
+  "layout": {
+    "fps": 30,
+    "leadFrames": { "s1": 6, "default": 8 },
+    "tailFrames": { "s1": 20, "s2": 20, "s3": 24, "s4": 50, "s5": 60, "s6": 120 },
+    "minSeconds": 55,
+    "maxSeconds": 65
+  },
+  "scenes": [
+    {
+      "id": "s1",
+      "name": "Hook",
+      "label": "01 — THE QUESTION",
+      "accent": "orange",
+      "text": "You built this business with a partner. But if they suddenly passed away... who would own their shares?",
+      "display": "You built this business with a partner. But if they suddenly passed away... who would own their shares?",
+      "emphasis": ["partner", "passed", "away", "shares"],
+      "cues": {
+        "built": "built",
+        "partner": "partner",
+        "suddenly": "suddenly",
+        "passed": "passed",
+        "who": "who",
+        "shares": "shares"
+      }
+    },
+    {
+      "id": "s2",
+      "name": "OwnershipRisk",
+      "label": "02 — THE PROBLEM",
+      "accent": "orange",
+      "text": "Their shares may pass to their estate. You could end up sharing ownership with people who never planned to be involved. And their family may need cash, not shares.",
+      "display": "Their shares may pass to their estate. You could end up sharing ownership with people who never planned to be involved. And their family may need cash, not shares.",
+      "emphasis": ["estate", "sharing", "ownership", "cash", "family"],
+      "cues": {
+        "estate": "estate",
+        "sharing": "sharing",
+        "people": "people",
+        "involved": "involved",
+        "family": "family",
+        "cash": "cash",
+        "notShares": ["shares", 1]
+      }
+    },
+    {
+      "id": "s3",
+      "name": "Agreement",
+      "label": "03 — THE AGREEMENT",
+      "accent": "cobalt",
+      "text": "A buy-sell agreement sets out what happens when a specific event occurs: who can buy the shares, how the price is set, and the terms of the transfer.",
+      "display": "A buy-sell agreement sets out what happens when a specific event occurs: who can buy the shares, how the price is set, and the terms of the transfer.",
+      "emphasis": ["buy-sell", "agreement", "event", "buy", "price", "transfer"],
+      "cues": {
+        "agreement": "agreement",
+        "event": "event",
+        "buy": "buy",
+        "price": "price",
+        "terms": "terms",
+        "transfer": "transfer"
+      }
+    },
+    {
+      "id": "s4",
+      "name": "FundingGap",
+      "label": "04 — THE FUNDING PROBLEM",
+      "accent": "red",
+      "text": "But here's what many business owners overlook: an agreement doesn't give you the cash to buy the shares.",
+      "display": "But here's what many business owners overlook: an agreement doesn't give you the cash to buy the shares.",
+      "emphasis": ["overlook", "doesn't", "cash"],
+      "cues": {
+        "overlook": "overlook",
+        "agreement": "agreement",
+        "doesnt": "doesn't",
+        "cash": "cash",
+        "buy": "buy"
+      }
+    },
+    {
+      "id": "s5",
+      "name": "InsuranceSolution",
+      "label": "05 — THE FUNDING",
+      "accent": "teal",
+      "text": "Properly structured insurance can help fund the buyout, subject to policy terms, claims requirements, and how the arrangement is set up.",
+      "display": "Properly structured insurance can help fund the buyout, subject to policy terms, claims requirements, and how the arrangement is set up.",
+      "emphasis": ["insurance", "fund", "buyout", "subject", "policy", "claims"],
+      "cues": {
+        "insurance": "insurance",
+        "fund": "fund",
+        "buyout": "buyout",
+        "subject": "subject",
+        "terms": "terms",
+        "claims": "claims",
+        "arrangement": "arrangement"
+      }
+    },
+    {
+      "id": "s6",
+      "name": "CallToAction",
+      "label": "06 — NEXT STEP",
+      "accent": "teal",
+      "text": "If you share your business with other shareholders, don't leave succession to chance. Book a fifteen-minute shareholder continuity review.",
+      "display": "If you share your business with other shareholders, don't leave succession to chance. Book a 15-minute shareholder continuity review.",
+      "emphasis": ["shareholders", "succession", "chance", "15-minute", "review"],
+      "cues": {
+        "shareholders": "shareholders",
+        "succession": "succession",
+        "chance": "chance",
+        "book": "book",
+        "review": "review"
+      }
+    }
+  ]
+}

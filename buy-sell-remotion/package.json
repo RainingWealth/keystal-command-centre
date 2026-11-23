@@ -1,0 +1,26 @@
+{
+  "name": "buy-sell-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Buy-Sell Agreement explainer — Remotion (React + TypeScript), 1080x1920 @ 30fps",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts BuySell out/raw.mp4 --codec=h264 --crf=17 --pixel-format=yuv420p --audio-codec=aac --concurrency=4",
+    "still": "remotion still src/index.ts BuySell",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/captions": "4.0.545",
+    "@remotion/cli": "4.0.545",
+    "@remotion/fonts": "4.0.545",
+    "@remotion/layout-utils": "4.0.545",
+    "@remotion/media-utils": "4.0.545",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.545"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.8.3"
+  }
+}

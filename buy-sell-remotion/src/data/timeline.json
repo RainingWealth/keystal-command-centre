@@ -1,0 +1,2004 @@
+{
+ "fps": 30,
+ "width": 1080,
+ "height": 1920,
+ "totalFrames": 1735,
+ "scenes": [
+  {
+   "id": "s1",
+   "name": "Hook",
+   "label": "01 \u2014 THE QUESTION",
+   "accent": "orange",
+   "start": 0,
+   "duration": 185,
+   "voStart": 6,
+   "voFrames": 159,
+   "voFile": "audio/vo/s1.wav",
+   "voEnd": 165,
+   "words": [
+    {
+     "i": 0,
+     "text": "You",
+     "startFrame": 6,
+     "endFrame": 11,
+     "emphasis": false
+    },
+    {
+     "i": 1,
+     "text": "built",
+     "startFrame": 11,
+     "endFrame": 19,
+     "emphasis": false
+    },
+    {
+     "i": 2,
+     "text": "this",
+     "startFrame": 19,
+     "endFrame": 25,
+     "emphasis": false
+    },
+    {
+     "i": 3,
+     "text": "business",
+     "startFrame": 25,
+     "endFrame": 39,
+     "emphasis": false
+    },
+    {
+     "i": 4,
+     "text": "with",
+     "startFrame": 39,
+     "endFrame": 43,
+     "emphasis": false
+    },
+    {
+     "i": 5,
+     "text": "a",
+     "startFrame": 43,
+     "endFrame": 45,
+     "emphasis": false
+    },
+    {
+     "i": 6,
+     "text": "partner.",
+     "startFrame": 45,
+     "endFrame": 67,
+     "emphasis": true
+    },
+    {
+     "i": 7,
+     "text": "But",
+     "startFrame": 67,
+     "endFrame": 71,
+     "emphasis": false
+    },
+    {
+     "i": 8,
+     "text": "if",
+     "startFrame": 71,
+     "endFrame": 75,
+     "emphasis": false
+    },
+    {
+     "i": 9,
+     "text": "they",
+     "startFrame": 75,
+     "endFrame": 81,
+     "emphasis": false
+    },
+    {
+     "i": 10,
+     "text": "suddenly",
+     "startFrame": 81,
+     "endFrame": 92,
+     "emphasis": false
+    },
+    {
+     "i": 11,
+     "text": "passed",
+     "startFrame": 92,
+     "endFrame": 102,
+     "emphasis": true
+    },
+    {
+     "i": 12,
+     "text": "away...",
+     "startFrame": 102,
+     "endFrame": 124,
+     "emphasis": true
+    },
+    {
+     "i": 13,
+     "text": "who",
+     "startFrame": 124,
+     "endFrame": 128,
+     "emphasis": false
+    },
+    {
+     "i": 14,
+     "text": "would",
+     "startFrame": 128,
+     "endFrame": 131,
+     "emphasis": false
+    },
+    {
+     "i": 15,
+     "text": "own",
+     "startFrame": 131,
+     "endFrame": 138,
+     "emphasis": false
+    },
+    {
+     "i": 16,
+     "text": "their",
+     "startFrame": 138,
+     "endFrame": 143,
+     "emphasis": false
+    },
+    {
+     "i": 17,
+     "text": "shares?",
+     "startFrame": 143,
+     "endFrame": 172,
+     "emphasis": true
+    }
+   ],
+   "cues": {
+    "built": 11,
+    "partner": 45,
+    "suddenly": 81,
+    "passed": 92,
+    "who": 124,
+    "shares": 143
+   }
+  },
+  {
+   "id": "s2",
+   "name": "OwnershipRisk",
+   "label": "02 \u2014 THE PROBLEM",
+   "accent": "orange",
+   "start": 185,
+   "duration": 322,
+   "voStart": 193,
+   "voFrames": 294,
+   "voFile": "audio/vo/s2.wav",
+   "voEnd": 487,
+   "words": [
+    {
+     "i": 0,
+     "text": "Their",
+     "startFrame": 193,
+     "endFrame": 200,
+     "emphasis": false
+    },
+    {
+     "i": 1,
+     "text": "shares",
+     "startFrame": 200,
+     "endFrame": 213,
+     "emphasis": false
+    },
+    {
+     "i": 2,
+     "text": "may",
+     "startFrame": 213,
+     "endFrame": 219,
+     "emphasis": false
+    },
+    {
+     "i": 3,
+     "text": "pass",
+     "startFrame": 219,
+     "endFrame": 230,
+     "emphasis": false
+    },
+    {
+     "i": 4,
+     "text": "to",
+     "startFrame": 230,
+     "endFrame": 233,
+     "emphasis": false
+    },
+    {
+     "i": 5,
+     "text": "their",
+     "startFrame": 233,
+     "endFrame": 238,
+     "emphasis": false
+    },
+    {
+     "i": 6,
+     "text": "estate.",
+     "startFrame": 238,
+     "endFrame": 268,
+     "emphasis": true
+    },
+    {
+     "i": 7,
+     "text": "You",
+     "startFrame": 268,
+     "endFrame": 271,
+     "emphasis": false
+    },
+    {
+     "i": 8,
+     "text": "could",
+     "startFrame": 271,
+     "endFrame": 276,
+     "emphasis": false
+    },
+    {
+     "i": 9,
+     "text": "end",
+     "startFrame": 276,
+     "endFrame": 282,
+     "emphasis": false
+    },
+    {
+     "i": 10,
+     "text": "up",
+     "startFrame": 282,
+     "endFrame": 289,
+     "emphasis": false
+    },
+    {
+     "i": 11,
+     "text": "sharing",
+     "startFrame": 289,
+     "endFrame": 301,
+     "emphasis": true
+    },
+    {
+     "i": 12,
+     "text": "ownership",
+     "startFrame": 301,
+     "endFrame": 318,
+     "emphasis": true
+    },
+    {
+     "i": 13,
+     "text": "with",
+     "startFrame": 318,
+     "endFrame": 323,
+     "emphasis": false
+    },
+    {
+     "i": 14,
+     "text": "people",
+     "startFrame": 323,
+     "endFrame": 334,
+     "emphasis": false
+    },
+    {
+     "i": 15,
+     "text": "who",
+     "startFrame": 334,
+     "endFrame": 339,
+     "emphasis": false
+    },
+    {
+     "i": 16,
+     "text": "never",
+     "startFrame": 339,
+     "endFrame": 348,
+     "emphasis": false
+    },
+    {
+     "i": 17,
+     "text": "planned",
+     "startFrame": 348,
+     "endFrame": 360,
+     "emphasis": false
+    },
+    {
+     "i": 18,
+     "text": "to",
+     "startFrame": 360,
+     "endFrame": 363,
+     "emphasis": false
+    },
+    {
+     "i": 19,
+     "text": "be",
+     "startFrame": 363,
+     "endFrame": 367,
+     "emphasis": false
+    },
+    {
+     "i": 20,
+     "text": "involved.",
+     "startFrame": 367,
+     "endFrame": 400,
+     "emphasis": false
+    },
+    {
+     "i": 21,
+     "text": "And",
+     "startFrame": 400,
+     "endFrame": 404,
+     "emphasis": false
+    },
+    {
+     "i": 22,
+     "text": "their",
+     "startFrame": 404,
+     "endFrame": 409,
+     "emphasis": false
+    },
+    {
+     "i": 23,
+     "text": "family",
+     "startFrame": 409,
+     "endFrame": 424,
+     "emphasis": true
+    },
+    {
+     "i": 24,
+     "text": "may",
+     "startFrame": 424,
+     "endFrame": 430,
+     "emphasis": false
+    },
+    {
+     "i": 25,
+     "text": "need",
+     "startFrame": 430,
+     "endFrame": 437,
+     "emphasis": false
+    },
+    {
+     "i": 26,
+     "text": "cash,",
+     "startFrame": 437,
+     "endFrame": 457,
+     "emphasis": true
+    },
+    {
+     "i": 27,
+     "text": "not",
+     "startFrame": 457,
+     "endFrame": 465,
+     "emphasis": false
+    },
+    {
+     "i": 28,
+     "text": "shares.",
+     "startFrame": 465,
+     "endFrame": 494,
+     "emphasis": false
+    }
+   ],
+   "cues": {
+    "estate": 53,
+    "sharing": 104,
+    "people": 138,
+    "involved": 182,
+    "family": 224,
+    "cash": 252,
+    "notShares": 280
+   }
+  },
+  {
+   "id": "s3",
+   "name": "Agreement",
+   "label": "03 \u2014 THE AGREEMENT",
+   "accent": "cobalt",
+   "start": 507,
+   "duration": 299,
+   "voStart": 515,
+   "voFrames": 267,
+   "voFile": "audio/vo/s3.wav",
+   "voEnd": 782,
+   "words": [
+    {
+     "i": 0,
+     "text": "A",
+     "startFrame": 515,
+     "endFrame": 518,
+     "emphasis": false
+    },
+    {
+     "i": 1,
+     "text": "buy-sell",
+     "startFrame": 518,
+     "endFrame": 533,
+     "emphasis": true
+    },
+    {
+     "i": 2,
+     "text": "agreement",
+     "startFrame": 533,
+     "endFrame": 549,
+     "emphasis": true
+    },
+    {
+     "i": 3,
+     "text": "sets",
+     "startFrame": 549,
+     "endFrame": 558,
+     "emphasis": false
+    },
+    {
+     "i": 4,
+     "text": "out",
+     "startFrame": 558,
+     "endFrame": 565,
+     "emphasis": false
+    },
+    {
+     "i": 5,
+     "text": "what",
+     "startFrame": 565,
+     "endFrame": 569,
+     "emphasis": false
+    },
+    {
+     "i": 6,
+     "text": "happens",
+     "startFrame": 569,
+     "endFrame": 584,
+     "emphasis": false
+    },
+    {
+     "i": 7,
+     "text": "when",
+     "startFrame": 584,
+     "endFrame": 588,
+     "emphasis": false
+    },
+    {
+     "i": 8,
+     "text": "a",
+     "startFrame": 588,
+     "endFrame": 590,
+     "emphasis": false
+    },
+    {
+     "i": 9,
+     "text": "specific",
+     "startFrame": 590,
+     "endFrame": 605,
+     "emphasis": false
+    },
+    {
+     "i": 10,
+     "text": "event",
+     "startFrame": 605,
+     "endFrame": 614,
+     "emphasis": true
+    },
+    {
+     "i": 11,
+     "text": "occurs:",
+     "startFrame": 614,
+     "endFrame": 648,
+     "emphasis": false
+    },
+    {
+     "i": 12,
+     "text": "who",
+     "startFrame": 648,
+     "endFrame": 653,
+     "emphasis": false
+    },
+    {
+     "i": 13,
+     "text": "can",
+     "startFrame": 653,
+     "endFrame": 658,
+     "emphasis": false
+    },
+    {
+     "i": 14,
+     "text": "buy",
+     "startFrame": 658,
+     "endFrame": 665,
+     "emphasis": true
+    },
+    {
+     "i": 15,
+     "text": "the",
+     "startFrame": 665,
+     "endFrame": 669,
+     "emphasis": false
+    },
+    {
+     "i": 16,
+     "text": "shares,",
+     "startFrame": 669,
+     "endFrame": 694,
+     "emphasis": false
+    },
+    {
+     "i": 17,
+     "text": "how",
+     "startFrame": 694,
+     "endFrame": 699,
+     "emphasis": false
+    },
+    {
+     "i": 18,
+     "text": "the",
+     "startFrame": 699,
+     "endFrame": 701,
+     "emphasis": false
+    },
+    {
+     "i": 19,
+     "text": "price",
+     "startFrame": 701,
+     "endFrame": 712,
+     "emphasis": true
+    },
+    {
+     "i": 20,
+     "text": "is",
+     "startFrame": 712,
+     "endFrame": 716,
+     "emphasis": false
+    },
+    {
+     "i": 21,
+     "text": "set,",
+     "startFrame": 716,
+     "endFrame": 736,
+     "emphasis": false
+    },
+    {
+     "i": 22,
+     "text": "and",
+     "startFrame": 736,
+     "endFrame": 739,
+     "emphasis": false
+    },
+    {
+     "i": 23,
+     "text": "the",
+     "startFrame": 739,
+     "endFrame": 742,
+     "emphasis": false
+    },
+    {
+     "i": 24,
+     "text": "terms",
+     "startFrame": 742,
+     "endFrame": 754,
+     "emphasis": false
+    },
+    {
+     "i": 25,
+     "text": "of",
+     "startFrame": 754,
+     "endFrame": 757,
+     "emphasis": false
+    },
+    {
+     "i": 26,
+     "text": "the",
+     "startFrame": 757,
+     "endFrame": 759,
+     "emphasis": false
+    },
+    {
+     "i": 27,
+     "text": "transfer.",
+     "startFrame": 759,
+     "endFrame": 791,
+     "emphasis": true
+    }
+   ],
+   "cues": {
+    "agreement": 26,
+    "event": 98,
+    "buy": 151,
+    "price": 194,
+    "terms": 235,
+    "transfer": 252
+   }
+  },
+  {
+   "id": "s4",
+   "name": "FundingGap",
+   "label": "04 \u2014 THE FUNDING PROBLEM",
+   "accent": "red",
+   "start": 806,
+   "duration": 230,
+   "voStart": 814,
+   "voFrames": 172,
+   "voFile": "audio/vo/s4.wav",
+   "voEnd": 986,
+   "words": [
+    {
+     "i": 0,
+     "text": "But",
+     "startFrame": 814,
+     "endFrame": 818,
+     "emphasis": false
+    },
+    {
+     "i": 1,
+     "text": "here's",
+     "startFrame": 818,
+     "endFrame": 828,
+     "emphasis": false
+    },
+    {
+     "i": 2,
+     "text": "what",
+     "startFrame": 828,
+     "endFrame": 835,
+     "emphasis": false
+    },
+    {
+     "i": 3,
+     "text": "many",
+     "startFrame": 835,
+     "endFrame": 843,
+     "emphasis": false
+    },
+    {
+     "i": 4,
+     "text": "business",
+     "startFrame": 843,
+     "endFrame": 855,
+     "emphasis": false
+    },
+    {
+     "i": 5,
+     "text": "owners",
+     "startFrame": 855,
+     "endFrame": 867,
+     "emphasis": false
+    },
+    {
+     "i": 6,
+     "text": "overlook:",
+     "startFrame": 867,
+     "endFrame": 900,
+     "emphasis": true
+    },
+    {
+     "i": 7,
+     "text": "an",
+     "startFrame": 900,
+     "endFrame": 904,
+     "emphasis": false
+    },
+    {
+     "i": 8,
+     "text": "agreement",
+     "startFrame": 904,
+     "endFrame": 918,
+     "emphasis": false
+    },
+    {
+     "i": 9,
+     "text": "doesn't",
+     "startFrame": 918,
+     "endFrame": 927,
+     "emphasis": true
+    },
+    {
+     "i": 10,
+     "text": "give",
+     "startFrame": 927,
+     "endFrame": 932,
+     "emphasis": false
+    },
+    {
+     "i": 11,
+     "text": "you",
+     "startFrame": 932,
+     "endFrame": 934,
+     "emphasis": false
+    },
+    {
+     "i": 12,
+     "text": "the",
+     "startFrame": 934,
+     "endFrame": 938,
+     "emphasis": false
+    },
+    {
+     "i": 13,
+     "text": "cash",
+     "startFrame": 938,
+     "endFrame": 950,
+     "emphasis": true
+    },
+    {
+     "i": 14,
+     "text": "to",
+     "startFrame": 950,
+     "endFrame": 953,
+     "emphasis": false
+    },
+    {
+     "i": 15,
+     "text": "buy",
+     "startFrame": 953,
+     "endFrame": 960,
+     "emphasis": false
+    },
+    {
+     "i": 16,
+     "text": "the",
+     "startFrame": 960,
+     "endFrame": 964,
+     "emphasis": false
+    },
+    {
+     "i": 17,
+     "text": "shares.",
+     "startFrame": 964,
+     "endFrame": 993,
+     "emphasis": false
+    }
+   ],
+   "cues": {
+    "overlook": 61,
+    "agreement": 98,
+    "doesnt": 112,
+    "cash": 132,
+    "buy": 147
+   }
+  },
+  {
+   "id": "s5",
+   "name": "InsuranceSolution",
+   "label": "05 \u2014 THE FUNDING",
+   "accent": "teal",
+   "start": 1036,
+   "duration": 324,
+   "voStart": 1044,
+   "voFrames": 256,
+   "voFile": "audio/vo/s5.wav",
+   "voEnd": 1300,
+   "words": [
+    {
+     "i": 0,
+     "text": "Properly",
+     "startFrame": 1044,
+     "endFrame": 1059,
+     "emphasis": false
+    },
+    {
+     "i": 1,
+     "text": "structured",
+     "startFrame": 1059,
+     "endFrame": 1075,
+     "emphasis": false
+    },
+    {
+     "i": 2,
+     "text": "insurance",
+     "startFrame": 1075,
+     "endFrame": 1095,
+     "emphasis": true
+    },
+    {
+     "i": 3,
+     "text": "can",
+     "startFrame": 1095,
+     "endFrame": 1099,
+     "emphasis": false
+    },
+    {
+     "i": 4,
+     "text": "help",
+     "startFrame": 1099,
+     "endFrame": 1107,
+     "emphasis": false
+    },
+    {
+     "i": 5,
+     "text": "fund",
+     "startFrame": 1107,
+     "endFrame": 1114,
+     "emphasis": true
+    },
+    {
+     "i": 6,
+     "text": "the",
+     "startFrame": 1114,
+     "endFrame": 1116,
+     "emphasis": false
+    },
+    {
+     "i": 7,
+     "text": "buyout,",
+     "startFrame": 1116,
+     "endFrame": 1144,
+     "emphasis": true
+    },
+    {
+     "i": 8,
+     "text": "subject",
+     "startFrame": 1144,
+     "endFrame": 1158,
+     "emphasis": true
+    },
+    {
+     "i": 9,
+     "text": "to",
+     "startFrame": 1158,
+     "endFrame": 1161,
+     "emphasis": false
+    },
+    {
+     "i": 10,
+     "text": "policy",
+     "startFrame": 1161,
+     "endFrame": 1174,
+     "emphasis": true
+    },
+    {
+     "i": 11,
+     "text": "terms,",
+     "startFrame": 1174,
+     "endFrame": 1196,
+     "emphasis": false
+    },
+    {
+     "i": 12,
+     "text": "claims",
+     "startFrame": 1196,
+     "endFrame": 1209,
+     "emphasis": true
+    },
+    {
+     "i": 13,
+     "text": "requirements,",
+     "startFrame": 1209,
+     "endFrame": 1244,
+     "emphasis": false
+    },
+    {
+     "i": 14,
+     "text": "and",
+     "startFrame": 1244,
+     "endFrame": 1248,
+     "emphasis": false
+    },
+    {
+     "i": 15,
+     "text": "how",
+     "startFrame": 1248,
+     "endFrame": 1253,
+     "emphasis": false
+    },
+    {
+     "i": 16,
+     "text": "the",
+     "startFrame": 1253,
+     "endFrame": 1257,
+     "emphasis": false
+    },
+    {
+     "i": 17,
+     "text": "arrangement",
+     "startFrame": 1257,
+     "endFrame": 1278,
+     "emphasis": false
+    },
+    {
+     "i": 18,
+     "text": "is",
+     "startFrame": 1278,
+     "endFrame": 1282,
+     "emphasis": false
+    },
+    {
+     "i": 19,
+     "text": "set",
+     "startFrame": 1282,
+     "endFrame": 1288,
+     "emphasis": false
+    },
+    {
+     "i": 20,
+     "text": "up.",
+     "startFrame": 1288,
+     "endFrame": 1308,
+     "emphasis": false
+    }
+   ],
+   "cues": {
+    "insurance": 39,
+    "fund": 71,
+    "buyout": 80,
+    "subject": 108,
+    "terms": 138,
+    "claims": 160,
+    "arrangement": 221
+   }
+  },
+  {
+   "id": "s6",
+   "name": "CallToAction",
+   "label": "06 \u2014 NEXT STEP",
+   "accent": "teal",
+   "start": 1360,
+   "duration": 375,
+   "voStart": 1368,
+   "voFrames": 247,
+   "voFile": "audio/vo/s6.wav",
+   "voEnd": 1615,
+   "words": [
+    {
+     "i": 0,
+     "text": "If",
+     "startFrame": 1368,
+     "endFrame": 1373,
+     "emphasis": false
+    },
+    {
+     "i": 1,
+     "text": "you",
+     "startFrame": 1373,
+     "endFrame": 1378,
+     "emphasis": false
+    },
+    {
+     "i": 2,
+     "text": "share",
+     "startFrame": 1378,
+     "endFrame": 1387,
+     "emphasis": false
+    },
+    {
+     "i": 3,
+     "text": "your",
+     "startFrame": 1387,
+     "endFrame": 1392,
+     "emphasis": false
+    },
+    {
+     "i": 4,
+     "text": "business",
+     "startFrame": 1392,
+     "endFrame": 1404,
+     "emphasis": false
+    },
+    {
+     "i": 5,
+     "text": "with",
+     "startFrame": 1404,
+     "endFrame": 1409,
+     "emphasis": false
+    },
+    {
+     "i": 6,
+     "text": "other",
+     "startFrame": 1409,
+     "endFrame": 1417,
+     "emphasis": false
+    },
+    {
+     "i": 7,
+     "text": "shareholders,",
+     "startFrame": 1417,
+     "endFrame": 1450,
+     "emphasis": true
+    },
+    {
+     "i": 8,
+     "text": "don't",
+     "startFrame": 1450,
+     "endFrame": 1458,
+     "emphasis": false
+    },
+    {
+     "i": 9,
+     "text": "leave",
+     "startFrame": 1458,
+     "endFrame": 1467,
+     "emphasis": false
+    },
+    {
+     "i": 10,
+     "text": "succession",
+     "startFrame": 1467,
+     "endFrame": 1484,
+     "emphasis": true
+    },
+    {
+     "i": 11,
+     "text": "to",
+     "startFrame": 1484,
+     "endFrame": 1488,
+     "emphasis": false
+    },
+    {
+     "i": 12,
+     "text": "chance.",
+     "startFrame": 1488,
+     "endFrame": 1519,
+     "emphasis": true
+    },
+    {
+     "i": 13,
+     "text": "Book",
+     "startFrame": 1519,
+     "endFrame": 1527,
+     "emphasis": false
+    },
+    {
+     "i": 14,
+     "text": "a",
+     "startFrame": 1527,
+     "endFrame": 1530,
+     "emphasis": false
+    },
+    {
+     "i": 15,
+     "text": "15-minute",
+     "startFrame": 1530,
+     "endFrame": 1555,
+     "emphasis": true
+    },
+    {
+     "i": 16,
+     "text": "shareholder",
+     "startFrame": 1555,
+     "endFrame": 1575,
+     "emphasis": false
+    },
+    {
+     "i": 17,
+     "text": "continuity",
+     "startFrame": 1575,
+     "endFrame": 1596,
+     "emphasis": false
+    },
+    {
+     "i": 18,
+     "text": "review.",
+     "startFrame": 1596,
+     "endFrame": 1623,
+     "emphasis": true
+    }
+   ],
+   "cues": {
+    "shareholders": 57,
+    "succession": 107,
+    "chance": 128,
+    "book": 159,
+    "review": 236
+   }
+  }
+ ],
+ "captions": [
+  {
+   "text": "You",
+   "startMs": 214,
+   "endMs": 352,
+   "timestampMs": 283,
+   "confidence": null
+  },
+  {
+   "text": " built",
+   "startMs": 352,
+   "endMs": 639,
+   "timestampMs": 496,
+   "confidence": null
+  },
+  {
+   "text": " this",
+   "startMs": 639,
+   "endMs": 839,
+   "timestampMs": 739,
+   "confidence": null
+  },
+  {
+   "text": " business",
+   "startMs": 839,
+   "endMs": 1289,
+   "timestampMs": 1064,
+   "confidence": null
+  },
+  {
+   "text": " with",
+   "startMs": 1289,
+   "endMs": 1427,
+   "timestampMs": 1358,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 1427,
+   "endMs": 1489,
+   "timestampMs": 1458,
+   "confidence": null
+  },
+  {
+   "text": " partner.",
+   "startMs": 1489,
+   "endMs": 2239,
+   "timestampMs": 1864,
+   "confidence": null
+  },
+  {
+   "text": " But",
+   "startMs": 2239,
+   "endMs": 2377,
+   "timestampMs": 2308,
+   "confidence": null
+  },
+  {
+   "text": " if",
+   "startMs": 2377,
+   "endMs": 2489,
+   "timestampMs": 2433,
+   "confidence": null
+  },
+  {
+   "text": " they",
+   "startMs": 2489,
+   "endMs": 2689,
+   "timestampMs": 2589,
+   "confidence": null
+  },
+  {
+   "text": " suddenly",
+   "startMs": 2689,
+   "endMs": 3064,
+   "timestampMs": 2876,
+   "confidence": null
+  },
+  {
+   "text": " passed",
+   "startMs": 3064,
+   "endMs": 3389,
+   "timestampMs": 3226,
+   "confidence": null
+  },
+  {
+   "text": " away...",
+   "startMs": 3389,
+   "endMs": 4139,
+   "timestampMs": 3764,
+   "confidence": null
+  },
+  {
+   "text": " who",
+   "startMs": 4139,
+   "endMs": 4252,
+   "timestampMs": 4196,
+   "confidence": null
+  },
+  {
+   "text": " would",
+   "startMs": 4252,
+   "endMs": 4364,
+   "timestampMs": 4308,
+   "confidence": null
+  },
+  {
+   "text": " own",
+   "startMs": 4364,
+   "endMs": 4589,
+   "timestampMs": 4476,
+   "confidence": null
+  },
+  {
+   "text": " their",
+   "startMs": 4589,
+   "endMs": 4777,
+   "timestampMs": 4683,
+   "confidence": null
+  },
+  {
+   "text": " shares?",
+   "startMs": 4777,
+   "endMs": 5739,
+   "timestampMs": 5258,
+   "confidence": null
+  },
+  {
+   "text": " Their",
+   "startMs": 6447,
+   "endMs": 6672,
+   "timestampMs": 6560,
+   "confidence": null
+  },
+  {
+   "text": " shares",
+   "startMs": 6672,
+   "endMs": 7097,
+   "timestampMs": 6885,
+   "confidence": null
+  },
+  {
+   "text": " may",
+   "startMs": 7097,
+   "endMs": 7285,
+   "timestampMs": 7191,
+   "confidence": null
+  },
+  {
+   "text": " pass",
+   "startMs": 7285,
+   "endMs": 7672,
+   "timestampMs": 7479,
+   "confidence": null
+  },
+  {
+   "text": " to",
+   "startMs": 7672,
+   "endMs": 7760,
+   "timestampMs": 7716,
+   "confidence": null
+  },
+  {
+   "text": " their",
+   "startMs": 7760,
+   "endMs": 7947,
+   "timestampMs": 7854,
+   "confidence": null
+  },
+  {
+   "text": " estate.",
+   "startMs": 7947,
+   "endMs": 8922,
+   "timestampMs": 8435,
+   "confidence": null
+  },
+  {
+   "text": " You",
+   "startMs": 8922,
+   "endMs": 9047,
+   "timestampMs": 8985,
+   "confidence": null
+  },
+  {
+   "text": " could",
+   "startMs": 9047,
+   "endMs": 9197,
+   "timestampMs": 9122,
+   "confidence": null
+  },
+  {
+   "text": " end",
+   "startMs": 9197,
+   "endMs": 9410,
+   "timestampMs": 9304,
+   "confidence": null
+  },
+  {
+   "text": " up",
+   "startMs": 9410,
+   "endMs": 9622,
+   "timestampMs": 9516,
+   "confidence": null
+  },
+  {
+   "text": " sharing",
+   "startMs": 9622,
+   "endMs": 10035,
+   "timestampMs": 9829,
+   "confidence": null
+  },
+  {
+   "text": " ownership",
+   "startMs": 10035,
+   "endMs": 10597,
+   "timestampMs": 10316,
+   "confidence": null
+  },
+  {
+   "text": " with",
+   "startMs": 10597,
+   "endMs": 10772,
+   "timestampMs": 10685,
+   "confidence": null
+  },
+  {
+   "text": " people",
+   "startMs": 10772,
+   "endMs": 11147,
+   "timestampMs": 10960,
+   "confidence": null
+  },
+  {
+   "text": " who",
+   "startMs": 11147,
+   "endMs": 11297,
+   "timestampMs": 11222,
+   "confidence": null
+  },
+  {
+   "text": " never",
+   "startMs": 11297,
+   "endMs": 11610,
+   "timestampMs": 11454,
+   "confidence": null
+  },
+  {
+   "text": " planned",
+   "startMs": 11610,
+   "endMs": 11997,
+   "timestampMs": 11804,
+   "confidence": null
+  },
+  {
+   "text": " to",
+   "startMs": 11997,
+   "endMs": 12085,
+   "timestampMs": 12041,
+   "confidence": null
+  },
+  {
+   "text": " be",
+   "startMs": 12085,
+   "endMs": 12222,
+   "timestampMs": 12154,
+   "confidence": null
+  },
+  {
+   "text": " involved.",
+   "startMs": 12222,
+   "endMs": 13322,
+   "timestampMs": 12772,
+   "confidence": null
+  },
+  {
+   "text": " And",
+   "startMs": 13322,
+   "endMs": 13460,
+   "timestampMs": 13391,
+   "confidence": null
+  },
+  {
+   "text": " their",
+   "startMs": 13460,
+   "endMs": 13635,
+   "timestampMs": 13548,
+   "confidence": null
+  },
+  {
+   "text": " family",
+   "startMs": 13635,
+   "endMs": 14147,
+   "timestampMs": 13891,
+   "confidence": null
+  },
+  {
+   "text": " may",
+   "startMs": 14147,
+   "endMs": 14322,
+   "timestampMs": 14235,
+   "confidence": null
+  },
+  {
+   "text": " need",
+   "startMs": 14322,
+   "endMs": 14560,
+   "timestampMs": 14441,
+   "confidence": null
+  },
+  {
+   "text": " cash,",
+   "startMs": 14560,
+   "endMs": 15247,
+   "timestampMs": 14904,
+   "confidence": null
+  },
+  {
+   "text": " not",
+   "startMs": 15247,
+   "endMs": 15510,
+   "timestampMs": 15379,
+   "confidence": null
+  },
+  {
+   "text": " shares.",
+   "startMs": 15510,
+   "endMs": 16472,
+   "timestampMs": 15991,
+   "confidence": null
+  },
+  {
+   "text": " A",
+   "startMs": 17182,
+   "endMs": 17270,
+   "timestampMs": 17226,
+   "confidence": null
+  },
+  {
+   "text": " buy-sell",
+   "startMs": 17270,
+   "endMs": 17782,
+   "timestampMs": 17526,
+   "confidence": null
+  },
+  {
+   "text": " agreement",
+   "startMs": 17782,
+   "endMs": 18307,
+   "timestampMs": 18044,
+   "confidence": null
+  },
+  {
+   "text": " sets",
+   "startMs": 18307,
+   "endMs": 18607,
+   "timestampMs": 18457,
+   "confidence": null
+  },
+  {
+   "text": " out",
+   "startMs": 18607,
+   "endMs": 18832,
+   "timestampMs": 18719,
+   "confidence": null
+  },
+  {
+   "text": " what",
+   "startMs": 18832,
+   "endMs": 18982,
+   "timestampMs": 18907,
+   "confidence": null
+  },
+  {
+   "text": " happens",
+   "startMs": 18982,
+   "endMs": 19470,
+   "timestampMs": 19226,
+   "confidence": null
+  },
+  {
+   "text": " when",
+   "startMs": 19470,
+   "endMs": 19595,
+   "timestampMs": 19532,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 19595,
+   "endMs": 19657,
+   "timestampMs": 19626,
+   "confidence": null
+  },
+  {
+   "text": " specific",
+   "startMs": 19657,
+   "endMs": 20182,
+   "timestampMs": 19919,
+   "confidence": null
+  },
+  {
+   "text": " event",
+   "startMs": 20182,
+   "endMs": 20457,
+   "timestampMs": 20319,
+   "confidence": null
+  },
+  {
+   "text": " occurs:",
+   "startMs": 20457,
+   "endMs": 21595,
+   "timestampMs": 21026,
+   "confidence": null
+  },
+  {
+   "text": " who",
+   "startMs": 21595,
+   "endMs": 21757,
+   "timestampMs": 21676,
+   "confidence": null
+  },
+  {
+   "text": " can",
+   "startMs": 21757,
+   "endMs": 21932,
+   "timestampMs": 21844,
+   "confidence": null
+  },
+  {
+   "text": " buy",
+   "startMs": 21932,
+   "endMs": 22157,
+   "timestampMs": 22044,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 22157,
+   "endMs": 22307,
+   "timestampMs": 22232,
+   "confidence": null
+  },
+  {
+   "text": " shares,",
+   "startMs": 22307,
+   "endMs": 23132,
+   "timestampMs": 22719,
+   "confidence": null
+  },
+  {
+   "text": " how",
+   "startMs": 23132,
+   "endMs": 23295,
+   "timestampMs": 23213,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 23295,
+   "endMs": 23382,
+   "timestampMs": 23338,
+   "confidence": null
+  },
+  {
+   "text": " price",
+   "startMs": 23382,
+   "endMs": 23732,
+   "timestampMs": 23557,
+   "confidence": null
+  },
+  {
+   "text": " is",
+   "startMs": 23732,
+   "endMs": 23870,
+   "timestampMs": 23801,
+   "confidence": null
+  },
+  {
+   "text": " set,",
+   "startMs": 23870,
+   "endMs": 24520,
+   "timestampMs": 24195,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 24520,
+   "endMs": 24645,
+   "timestampMs": 24582,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 24645,
+   "endMs": 24745,
+   "timestampMs": 24695,
+   "confidence": null
+  },
+  {
+   "text": " terms",
+   "startMs": 24745,
+   "endMs": 25145,
+   "timestampMs": 24945,
+   "confidence": null
+  },
+  {
+   "text": " of",
+   "startMs": 25145,
+   "endMs": 25220,
+   "timestampMs": 25182,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 25220,
+   "endMs": 25307,
+   "timestampMs": 25263,
+   "confidence": null
+  },
+  {
+   "text": " transfer.",
+   "startMs": 25307,
+   "endMs": 26357,
+   "timestampMs": 25832,
+   "confidence": null
+  },
+  {
+   "text": " But",
+   "startMs": 27133,
+   "endMs": 27251,
+   "timestampMs": 27192,
+   "confidence": null
+  },
+  {
+   "text": " here's",
+   "startMs": 27251,
+   "endMs": 27614,
+   "timestampMs": 27433,
+   "confidence": null
+  },
+  {
+   "text": " what",
+   "startMs": 27614,
+   "endMs": 27839,
+   "timestampMs": 27727,
+   "confidence": null
+  },
+  {
+   "text": " many",
+   "startMs": 27839,
+   "endMs": 28101,
+   "timestampMs": 27970,
+   "confidence": null
+  },
+  {
+   "text": " business",
+   "startMs": 28101,
+   "endMs": 28514,
+   "timestampMs": 28308,
+   "confidence": null
+  },
+  {
+   "text": " owners",
+   "startMs": 28514,
+   "endMs": 28914,
+   "timestampMs": 28714,
+   "confidence": null
+  },
+  {
+   "text": " overlook:",
+   "startMs": 28914,
+   "endMs": 30001,
+   "timestampMs": 29458,
+   "confidence": null
+  },
+  {
+   "text": " an",
+   "startMs": 30001,
+   "endMs": 30139,
+   "timestampMs": 30070,
+   "confidence": null
+  },
+  {
+   "text": " agreement",
+   "startMs": 30139,
+   "endMs": 30614,
+   "timestampMs": 30377,
+   "confidence": null
+  },
+  {
+   "text": " doesn't",
+   "startMs": 30614,
+   "endMs": 30889,
+   "timestampMs": 30752,
+   "confidence": null
+  },
+  {
+   "text": " give",
+   "startMs": 30889,
+   "endMs": 31051,
+   "timestampMs": 30970,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 31051,
+   "endMs": 31126,
+   "timestampMs": 31089,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 31126,
+   "endMs": 31251,
+   "timestampMs": 31189,
+   "confidence": null
+  },
+  {
+   "text": " cash",
+   "startMs": 31251,
+   "endMs": 31664,
+   "timestampMs": 31458,
+   "confidence": null
+  },
+  {
+   "text": " to",
+   "startMs": 31664,
+   "endMs": 31764,
+   "timestampMs": 31714,
+   "confidence": null
+  },
+  {
+   "text": " buy",
+   "startMs": 31764,
+   "endMs": 31989,
+   "timestampMs": 31877,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 31989,
+   "endMs": 32126,
+   "timestampMs": 32058,
+   "confidence": null
+  },
+  {
+   "text": " shares.",
+   "startMs": 32126,
+   "endMs": 33089,
+   "timestampMs": 32608,
+   "confidence": null
+  },
+  {
+   "text": " Properly",
+   "startMs": 34800,
+   "endMs": 35290,
+   "timestampMs": 35045,
+   "confidence": null
+  },
+  {
+   "text": " structured",
+   "startMs": 35290,
+   "endMs": 35840,
+   "timestampMs": 35565,
+   "confidence": null
+  },
+  {
+   "text": " insurance",
+   "startMs": 35840,
+   "endMs": 36490,
+   "timestampMs": 36165,
+   "confidence": null
+  },
+  {
+   "text": " can",
+   "startMs": 36490,
+   "endMs": 36640,
+   "timestampMs": 36565,
+   "confidence": null
+  },
+  {
+   "text": " help",
+   "startMs": 36640,
+   "endMs": 36915,
+   "timestampMs": 36778,
+   "confidence": null
+  },
+  {
+   "text": " fund",
+   "startMs": 36915,
+   "endMs": 37128,
+   "timestampMs": 37022,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 37128,
+   "endMs": 37215,
+   "timestampMs": 37172,
+   "confidence": null
+  },
+  {
+   "text": " buyout,",
+   "startMs": 37215,
+   "endMs": 38128,
+   "timestampMs": 37672,
+   "confidence": null
+  },
+  {
+   "text": " subject",
+   "startMs": 38128,
+   "endMs": 38615,
+   "timestampMs": 38372,
+   "confidence": null
+  },
+  {
+   "text": " to",
+   "startMs": 38615,
+   "endMs": 38715,
+   "timestampMs": 38665,
+   "confidence": null
+  },
+  {
+   "text": " policy",
+   "startMs": 38715,
+   "endMs": 39140,
+   "timestampMs": 38928,
+   "confidence": null
+  },
+  {
+   "text": " terms,",
+   "startMs": 39140,
+   "endMs": 39878,
+   "timestampMs": 39509,
+   "confidence": null
+  },
+  {
+   "text": " claims",
+   "startMs": 39878,
+   "endMs": 40290,
+   "timestampMs": 40084,
+   "confidence": null
+  },
+  {
+   "text": " requirements,",
+   "startMs": 40290,
+   "endMs": 41465,
+   "timestampMs": 40878,
+   "confidence": null
+  },
+  {
+   "text": " and",
+   "startMs": 41465,
+   "endMs": 41590,
+   "timestampMs": 41528,
+   "confidence": null
+  },
+  {
+   "text": " how",
+   "startMs": 41590,
+   "endMs": 41778,
+   "timestampMs": 41684,
+   "confidence": null
+  },
+  {
+   "text": " the",
+   "startMs": 41778,
+   "endMs": 41915,
+   "timestampMs": 41846,
+   "confidence": null
+  },
+  {
+   "text": " arrangement",
+   "startMs": 41915,
+   "endMs": 42590,
+   "timestampMs": 42252,
+   "confidence": null
+  },
+  {
+   "text": " is",
+   "startMs": 42590,
+   "endMs": 42728,
+   "timestampMs": 42659,
+   "confidence": null
+  },
+  {
+   "text": " set",
+   "startMs": 42728,
+   "endMs": 42928,
+   "timestampMs": 42828,
+   "confidence": null
+  },
+  {
+   "text": " up.",
+   "startMs": 42928,
+   "endMs": 43615,
+   "timestampMs": 43272,
+   "confidence": null
+  },
+  {
+   "text": " If",
+   "startMs": 45600,
+   "endMs": 45761,
+   "timestampMs": 45680,
+   "confidence": null
+  },
+  {
+   "text": " you",
+   "startMs": 45761,
+   "endMs": 45949,
+   "timestampMs": 45855,
+   "confidence": null
+  },
+  {
+   "text": " share",
+   "startMs": 45949,
+   "endMs": 46236,
+   "timestampMs": 46092,
+   "confidence": null
+  },
+  {
+   "text": " your",
+   "startMs": 46236,
+   "endMs": 46386,
+   "timestampMs": 46311,
+   "confidence": null
+  },
+  {
+   "text": " business",
+   "startMs": 46386,
+   "endMs": 46811,
+   "timestampMs": 46598,
+   "confidence": null
+  },
+  {
+   "text": " with",
+   "startMs": 46811,
+   "endMs": 46961,
+   "timestampMs": 46886,
+   "confidence": null
+  },
+  {
+   "text": " other",
+   "startMs": 46961,
+   "endMs": 47249,
+   "timestampMs": 47105,
+   "confidence": null
+  },
+  {
+   "text": " shareholders,",
+   "startMs": 47249,
+   "endMs": 48324,
+   "timestampMs": 47786,
+   "confidence": null
+  },
+  {
+   "text": " don't",
+   "startMs": 48324,
+   "endMs": 48611,
+   "timestampMs": 48468,
+   "confidence": null
+  },
+  {
+   "text": " leave",
+   "startMs": 48611,
+   "endMs": 48886,
+   "timestampMs": 48748,
+   "confidence": null
+  },
+  {
+   "text": " succession",
+   "startMs": 48886,
+   "endMs": 49461,
+   "timestampMs": 49174,
+   "confidence": null
+  },
+  {
+   "text": " to",
+   "startMs": 49461,
+   "endMs": 49586,
+   "timestampMs": 49524,
+   "confidence": null
+  },
+  {
+   "text": " chance.",
+   "startMs": 49586,
+   "endMs": 50636,
+   "timestampMs": 50111,
+   "confidence": null
+  },
+  {
+   "text": " Book",
+   "startMs": 50636,
+   "endMs": 50886,
+   "timestampMs": 50761,
+   "confidence": null
+  },
+  {
+   "text": " a",
+   "startMs": 50886,
+   "endMs": 51011,
+   "timestampMs": 50948,
+   "confidence": null
+  },
+  {
+   "text": " 15-minute",
+   "startMs": 51011,
+   "endMs": 51836,
+   "timestampMs": 51424,
+   "confidence": null
+  },
+  {
+   "text": " shareholder",
+   "startMs": 51836,
+   "endMs": 52499,
+   "timestampMs": 52168,
+   "confidence": null
+  },
+  {
+   "text": " continuity",
+   "startMs": 52499,
+   "endMs": 53211,
+   "timestampMs": 52855,
+   "confidence": null
+  },
+  {
+   "text": " review.",
+   "startMs": 53211,
+   "endMs": 54086,
+   "timestampMs": 53648,
+   "confidence": null
+  }
+ ]
+}
