@@ -1,0 +1,851 @@
+{
+ "dur": 119.7,
+ "fps": 30,
+ "shots": [
+  {
+   "id": "corridor",
+   "t0": 0.0,
+   "t1": 2.7,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "contract",
+   "t0": 2.7,
+   "t1": 5.2,
+   "tr": {
+    "type": "iris",
+    "d": 0.55
+   }
+  },
+  {
+   "id": "growth",
+   "t0": 5.2,
+   "t1": 8.8,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.4
+   }
+  },
+  {
+   "id": "toast",
+   "t0": 8.8,
+   "t1": 15.2,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.4
+   }
+  },
+  {
+   "id": "tower",
+   "t0": 15.2,
+   "t1": 19.4,
+   "tr": {
+    "type": "dark",
+    "d": 0.7
+   }
+  },
+  {
+   "id": "call",
+   "t0": 19.4,
+   "t1": 24.6,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.5
+   }
+  },
+  {
+   "id": "window",
+   "t0": 24.6,
+   "t1": 26.7,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "meetwide",
+   "t0": 26.7,
+   "t1": 29.4,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.8
+   }
+  },
+  {
+   "id": "sarah",
+   "t0": 29.4,
+   "t1": 36.0,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "estate",
+   "t0": 36.0,
+   "t1": 42.7,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "aaronclose",
+   "t0": 42.7,
+   "t1": 47.8,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "accounts",
+   "t0": 47.8,
+   "t1": 56.4,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.4
+   }
+  },
+  {
+   "id": "accountant",
+   "t0": 56.4,
+   "t1": 62.2,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.6
+   }
+  },
+  {
+   "id": "latedesk",
+   "t0": 62.2,
+   "t1": 64.6,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "photos",
+   "t0": 64.6,
+   "t1": 67.2,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.4
+   }
+  },
+  {
+   "id": "employees",
+   "t0": 67.2,
+   "t1": 70.0,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.4
+   }
+  },
+  {
+   "id": "loandoc",
+   "t0": 70.0,
+   "t1": 72.3,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "register",
+   "t0": 72.3,
+   "t1": 74.0,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.4
+   }
+  },
+  {
+   "id": "pullback",
+   "t0": 74.0,
+   "t1": 75.8,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "rewind",
+   "t0": 75.8,
+   "t1": 78.2,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "prepared",
+   "t0": 78.2,
+   "t1": 79.4,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.5
+   }
+  },
+  {
+   "id": "advisers",
+   "t0": 79.4,
+   "t1": 85.0,
+   "tr": {
+    "type": "cut",
+    "d": 0
+   }
+  },
+  {
+   "id": "steps",
+   "t0": 85.0,
+   "t1": 93.2,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.6
+   }
+  },
+  {
+   "id": "example",
+   "t0": 93.2,
+   "t1": 97.6,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.5
+   }
+  },
+  {
+   "id": "buyout",
+   "t0": 97.6,
+   "t1": 102.0,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.7
+   }
+  },
+  {
+   "id": "workers",
+   "t0": 102.0,
+   "t1": 104.8,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.5
+   }
+  },
+  {
+   "id": "home",
+   "t0": 104.8,
+   "t1": 107.9,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.5
+   }
+  },
+  {
+   "id": "sunrise",
+   "t0": 107.9,
+   "t1": 111.0,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.8
+   }
+  },
+  {
+   "id": "navy",
+   "t0": 111.0,
+   "t1": 119.7,
+   "tr": {
+    "type": "dissolve",
+    "d": 0.9
+   }
+  }
+ ],
+ "lines": {
+  "n01": {
+   "t": 3.2,
+   "d": 4.375,
+   "who": ""
+  },
+  "d01": {
+   "t": 9.0,
+   "d": 3.613,
+   "who": "Daniel"
+  },
+  "a01": {
+   "t": 12.95,
+   "d": 2.059,
+   "who": "Aaron"
+  },
+  "n02": {
+   "t": 15.4,
+   "d": 2.653,
+   "who": ""
+  },
+  "h01": {
+   "t": 19.9,
+   "d": 4.429,
+   "who": "Hospital"
+  },
+  "s01": {
+   "t": 29.2,
+   "d": 6.594,
+   "who": "Sarah"
+  },
+  "e01": {
+   "t": 36.1,
+   "d": 6.239,
+   "who": "Estate representative"
+  },
+  "a02": {
+   "t": 42.65,
+   "d": 4.846,
+   "who": "Aaron"
+  },
+  "n03": {
+   "t": 47.8,
+   "d": 6.74,
+   "who": ""
+  },
+  "c01": {
+   "t": 56.7,
+   "d": 5.575,
+   "who": "Accountant"
+  },
+  "n04": {
+   "t": 63.8,
+   "d": 9.315,
+   "who": ""
+  },
+  "d02": {
+   "t": 80.0,
+   "d": 2.243,
+   "who": "Daniel"
+  },
+  "n05": {
+   "t": 82.6,
+   "d": 10.258,
+   "who": ""
+  },
+  "s02": {
+   "t": 100.9,
+   "d": 1.099,
+   "who": "Sarah"
+  },
+  "n06": {
+   "t": 102.2,
+   "d": 5.073,
+   "who": ""
+  }
+ },
+ "cues": [
+  {
+   "t0": 3.15,
+   "t1": 5.7,
+   "text": "Two best friends. One business.",
+   "who": "",
+   "line": "n01"
+  },
+  {
+   "t0": 5.79,
+   "t1": 7.94,
+   "text": "15 years of hard work.",
+   "who": "",
+   "line": "n01"
+  },
+  {
+   "t0": 8.95,
+   "t1": 10.95,
+   "text": "Bro, 15 years already.",
+   "who": "Daniel",
+   "line": "d01"
+  },
+  {
+   "t0": 10.97,
+   "t1": 12.88,
+   "text": "We really built this from nothing.",
+   "who": "Daniel",
+   "line": "d01"
+  },
+  {
+   "t0": 12.9,
+   "t1": 15.19,
+   "text": "Next 15 years, we go bigger.",
+   "who": "Aaron",
+   "line": "a01"
+  },
+  {
+   "t0": 15.35,
+   "t1": 18.14,
+   "text": "Then one night, everything changed.",
+   "who": "",
+   "line": "n02"
+  },
+  {
+   "t0": 19.85,
+   "t1": 22.19,
+   "text": "Hello, Aaron? I'm calling from the hospital.",
+   "who": "Hospital",
+   "line": "h01"
+  },
+  {
+   "t0": 22.21,
+   "t1": 24.58,
+   "text": "I'm very sorry. It's about Daniel.",
+   "who": "Hospital",
+   "line": "h01"
+  },
+  {
+   "t0": 29.15,
+   "t1": 31.7,
+   "text": "Aaron, I know Daniel loved this business.",
+   "who": "Sarah",
+   "line": "s01"
+  },
+  {
+   "t0": 31.73,
+   "t1": 33.49,
+   "text": "But I don't know how to run it.",
+   "who": "Sarah",
+   "line": "s01"
+  },
+  {
+   "t0": 33.51,
+   "t1": 36.03,
+   "text": "The family needs financial security.",
+   "who": "Sarah",
+   "line": "s01"
+  },
+  {
+   "t0": 36.05,
+   "t1": 38.35,
+   "text": "Daniel's shares are part of his estate.",
+   "who": "Estate representative",
+   "line": "e01"
+  },
+  {
+   "t0": 38.37,
+   "t1": 39.89,
+   "text": "So any transfer follows the legal",
+   "who": "Estate representative",
+   "line": "e01"
+  },
+  {
+   "t0": 39.91,
+   "t1": 42.52,
+   "text": "documents and the estate process.",
+   "who": "Estate representative",
+   "line": "e01"
+  },
+  {
+   "t0": 42.6,
+   "t1": 45.06,
+   "text": "I understand. I want to buy his shares.",
+   "who": "Aaron",
+   "line": "a02"
+  },
+  {
+   "t0": 45.08,
+   "t1": 47.67,
+   "text": "But the company doesn't have that kind of cash.",
+   "who": "Aaron",
+   "line": "a02"
+  },
+  {
+   "t0": 47.75,
+   "t1": 49.45,
+   "text": "The business had value.",
+   "who": "",
+   "line": "n03"
+  },
+  {
+   "t0": 49.47,
+   "t1": 51.59,
+   "text": "But that didn't mean Aaron had a million",
+   "who": "",
+   "line": "n03"
+  },
+  {
+   "t0": 51.61,
+   "t1": 54.68,
+   "text": "dollars ready to buy Daniel's shares.",
+   "who": "",
+   "line": "n03"
+  },
+  {
+   "t0": 56.65,
+   "t1": 59.45,
+   "text": "To raise that amount, you may have to borrow heavily,",
+   "who": "Accountant",
+   "line": "c01"
+  },
+  {
+   "t0": 59.47,
+   "t1": 62.44,
+   "text": "sell assets, or bring in another investor.",
+   "who": "Accountant",
+   "line": "c01"
+  },
+  {
+   "t0": 63.75,
+   "t1": 65.98,
+   "text": "One family needed liquidity.",
+   "who": "",
+   "line": "n04"
+  },
+  {
+   "t0": 66.19,
+   "t1": 68.8,
+   "text": "One founder needed business continuity.",
+   "who": "",
+   "line": "n04"
+  },
+  {
+   "t0": 69.05,
+   "t1": 70.79,
+   "text": "Neither wanted a dispute.",
+   "who": "",
+   "line": "n04"
+  },
+  {
+   "t0": 70.81,
+   "t1": 73.38,
+   "text": "But there was no funded exit plan.",
+   "who": "",
+   "line": "n04"
+  },
+  {
+   "t0": 79.95,
+   "t1": 82.53,
+   "text": "Let's do this properly, while we can.",
+   "who": "Daniel",
+   "line": "d02"
+  },
+  {
+   "t0": 82.55,
+   "t1": 85.1,
+   "text": "The agreement establishes the path.",
+   "who": "",
+   "line": "n05"
+  },
+  {
+   "t0": 85.13,
+   "t1": 87.85,
+   "text": "Insurance can help provide the money.",
+   "who": "",
+   "line": "n05"
+  },
+  {
+   "t0": 87.87,
+   "t1": 89.69,
+   "text": "Together, they can turn a difficult",
+   "who": "",
+   "line": "n05"
+  },
+  {
+   "t0": 89.71,
+   "t1": 93.18,
+   "text": "ownership transition into a planned one.",
+   "who": "",
+   "line": "n05"
+  },
+  {
+   "t0": 100.85,
+   "t1": 102.13,
+   "text": "Thank you, Aaron.",
+   "who": "Sarah",
+   "line": "s02"
+  },
+  {
+   "t0": 102.15,
+   "t1": 103.63,
+   "text": "Daniel was gone.",
+   "who": "",
+   "line": "n06"
+  },
+  {
+   "t0": 103.65,
+   "t1": 107.56,
+   "text": "But the future he helped build didn't have to fall apart.",
+   "who": "",
+   "line": "n06"
+  }
+ ],
+ "strips": [
+  {
+   "id": "gone",
+   "kind": "strip",
+   "lines": [
+    "Daniel passed away",
+    "unexpectedly."
+   ],
+   "t0": 24.5,
+   "t1": 27.0,
+   "x": 540,
+   "y": 760,
+   "size": 64,
+   "anchor": "left"
+  },
+  {
+   "id": "later",
+   "kind": "strip",
+   "lines": [
+    "Several weeks later"
+   ],
+   "t0": 26.9,
+   "t1": 29.3,
+   "x": 540,
+   "y": 420,
+   "size": 54,
+   "anchor": "left"
+  },
+  {
+   "id": "v1",
+   "kind": "card",
+   "label": "Company value (illustrative)",
+   "value": "S$2,000,000",
+   "t0": 48.4,
+   "t1": 56.1,
+   "x": 540,
+   "y": 300,
+   "w": 840
+  },
+  {
+   "id": "v2",
+   "kind": "card",
+   "label": "Daniel’s 50% ownership",
+   "value": "S$1,000,000",
+   "t0": 50.5,
+   "t1": 56.1,
+   "x": 540,
+   "y": 470,
+   "w": 840
+  },
+  {
+   "id": "v3",
+   "kind": "card",
+   "label": "Available buyout cash",
+   "value": "Insufficient",
+   "t0": 52.7,
+   "t1": 56.1,
+   "x": 540,
+   "y": 640,
+   "w": 840,
+   "red": true
+  },
+  {
+   "id": "prep",
+   "kind": "strip",
+   "lines": [
+    "BUT WHAT IF",
+    "THEY HAD PREPARED?"
+   ],
+   "t0": 77.6,
+   "t1": 80.9,
+   "x": 540,
+   "y": 760,
+   "size": 70,
+   "anchor": "center"
+  },
+  {
+   "id": "s1",
+   "kind": "step",
+   "n": "1",
+   "head": "AGREE",
+   "sub": "Agreed terms and a valuation method set how the shares transfer.",
+   "t0": 82.9,
+   "t1": 93.3,
+   "x": 540,
+   "y": 270,
+   "w": 860
+  },
+  {
+   "id": "s2",
+   "kind": "step",
+   "n": "2",
+   "head": "FUND",
+   "sub": "Suitable life cover pays the designated recipient on a covered claim.",
+   "t0": 85.6,
+   "t1": 93.3,
+   "x": 540,
+   "y": 490,
+   "w": 860
+  },
+  {
+   "id": "s3",
+   "kind": "step",
+   "n": "3",
+   "head": "TRANSFER",
+   "sub": "After a valid claim and the legal steps, the survivor buys the shares from the estate.",
+   "t0": 88.5,
+   "t1": 93.3,
+   "x": 540,
+   "y": 710,
+   "w": 860
+  },
+  {
+   "id": "ex",
+   "kind": "example",
+   "lines": [
+    [
+     "Company value",
+     "S$2 million"
+    ],
+    [
+     "Daniel’s 50%",
+     "S$1 million"
+    ],
+    [
+     "Illustrative cover",
+     "S$1 million"
+    ]
+   ],
+   "note": "Illustrative only. Not a valuation or a guarantee.",
+   "t0": 93.3,
+   "t1": 97.5,
+   "x": 540,
+   "y": 950,
+   "w": 840
+  },
+  {
+   "id": "paid",
+   "kind": "strip",
+   "lines": [
+    "Paid to Daniel’s estate,",
+    "subject to estate administration"
+   ],
+   "t0": 98.3,
+   "t1": 102.2,
+   "x": 540,
+   "y": 330,
+   "size": 44,
+   "anchor": "left"
+  },
+  {
+   "id": "xfer",
+   "kind": "strip",
+   "lines": [
+    "Shares transferred to Aaron",
+    "under the agreement"
+   ],
+   "t0": 100.2,
+   "t1": 104.0,
+   "x": 540,
+   "y": 520,
+   "size": 44,
+   "anchor": "left"
+  },
+  {
+   "id": "e1",
+   "kind": "strip",
+   "lines": [
+    "You built the business",
+    "together."
+   ],
+   "t0": 108.3,
+   "t1": 111.0,
+   "x": 540,
+   "y": 640,
+   "size": 60,
+   "anchor": "left",
+   "navy": false
+  },
+  {
+   "id": "e2",
+   "kind": "endq",
+   "lines": [
+    "Have you planned what happens",
+    "when one of you is gone?"
+   ],
+   "t0": 111.35,
+   "t1": 115.0,
+   "x": 540,
+   "y": 760,
+   "size": 58
+  },
+  {
+   "id": "e3",
+   "kind": "endcard",
+   "title": "SHAREHOLDER BUY-SELL PLANNING",
+   "tag": "Protect ownership continuity. Plan estate liquidity.",
+   "cta": "Book a Business Continuity Review",
+   "t0": 115.0,
+   "t1": 119.7,
+   "x": 540,
+   "y": 560
+  },
+  {
+   "id": "disc",
+   "kind": "fine",
+   "lines": [
+    "Illustrative scenario only. Actual arrangements",
+    "depend on legal agreements, policy terms",
+    "and individual circumstances."
+   ],
+   "t0": 112.2,
+   "t1": 119.7,
+   "x": 540,
+   "y": 1330
+  }
+ ],
+ "hit": {
+  "buzz": [
+   0.85,
+   1.55
+  ],
+  "phoneglow": 1.0,
+  "lampclick": 24.9,
+  "pen": 3.7,
+  "shake": 4.55,
+  "cupclink": 11.55,
+  "ring": [
+   18.55,
+   19.1
+  ],
+  "answer": 19.55,
+  "silence0": 23.6,
+  "silence1": 25.6,
+  "piano_low": 25.6,
+  "farwin_off": 25.1,
+  "stamp": [
+   70.8,
+   71.4
+  ],
+  "regstare": 72.3,
+  "freeze": 74.0,
+  "rewind0": 75.8,
+  "rewind1": 78.2,
+  "tapestop": 75.8,
+  "calflip": [
+   76.0,
+   77.4
+  ],
+  "lampon": 78.5,
+  "step": [
+   82.9,
+   85.6,
+   88.5
+  ],
+  "paper": [
+   48.4,
+   50.5,
+   52.7
+  ],
+  "docslide": [
+   98.4
+  ],
+  "signature": [
+   99.4
+  ],
+  "sunrise": [
+   107.9
+  ],
+  "card": [
+   111.0,
+   115.0
+  ]
+ }
+}

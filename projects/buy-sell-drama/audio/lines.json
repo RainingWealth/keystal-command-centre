@@ -1,0 +1,94 @@
+[
+ {
+  "id": "n01",
+  "text": "Two best friends. One business. Fifteen years of hard work.",
+  "voice": "bm_george",
+  "speed": 0.93
+ },
+ {
+  "id": "d01",
+  "text": "Bro, fifteen years already. We really built this from nothing.",
+  "voice": "bm_lewis",
+  "speed": 1.0
+ },
+ {
+  "id": "a01",
+  "text": "Next fifteen years, we go bigger.",
+  "voice": "bm_daniel",
+  "speed": 1.0
+ },
+ {
+  "id": "n02",
+  "text": "Then one night, everything changed.",
+  "voice": "bm_george",
+  "speed": 0.9
+ },
+ {
+  "id": "h01",
+  "text": "Hello, Aaron? I'm calling from the hospital. I'm very sorry. It's about Daniel.",
+  "voice": "bf_alice",
+  "speed": 0.95
+ },
+ {
+  "id": "s01",
+  "text": "Aaron, I know Daniel loved this business. But I don't know how to run it. The family needs financial security.",
+  "voice": "bf_emma",
+  "speed": 0.97,
+  "asr": "Erin, I know Daniel loved this business. But I don't know how to run it. The family needs financial security."
+ },
+ {
+  "id": "e01",
+  "text": "Daniel's shares are part of his estate. So any transfer follows the legal documents and the estate process.",
+  "voice": "bm_fable",
+  "speed": 0.95
+ },
+ {
+  "id": "a02",
+  "text": "I understand. I want to buy his shares. But the company doesn't have that kind of cash.",
+  "voice": "bm_daniel",
+  "speed": 0.97
+ },
+ {
+  "id": "n03",
+  "text": "The business had value. But that didn't mean Aaron had a million dollars ready to buy Daniel's shares.",
+  "voice": "bm_george",
+  "speed": 0.93
+ },
+ {
+  "id": "c01",
+  "text": "To raise that amount, you may have to borrow heavily, sell assets, or bring in another investor.",
+  "voice": "bf_isabella",
+  "speed": 0.97
+ },
+ {
+  "id": "n04",
+  "text": "One family needed liquidity. One founder needed business continuity. Neither wanted a dispute. But there was no funded exit plan.",
+  "voice": "bm_george",
+  "speed": 0.93
+ },
+ {
+  "id": "d02",
+  "text": "Let's do this properly, while we can.",
+  "voice": "bm_lewis",
+  "speed": 0.97
+ },
+ {
+  "id": "n05",
+  "text": "The agreement establishes the path. Insurance can help provide the money. Together, they can turn a difficult ownership transition into a planned one.",
+  "voice": "bm_george",
+  "speed": 0.93
+ },
+ {
+  "id": "n06",
+  "text": "Daniel was gone. But the future he helped build didn't have to fall apart.",
+  "voice": "bm_george",
+  "speed": 0.9
+ },
+ {
+  "id": "s02",
+  "text": "Thank you, Aaron.",
+  "voice": "bf_emma",
+  "speed": 1.0,
+  "asr": "Thank you, Erin."
+ }
+]
