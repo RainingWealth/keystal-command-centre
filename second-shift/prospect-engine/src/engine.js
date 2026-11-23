@@ -30,8 +30,8 @@ const BLOCKED_DOMAINS = [
 ];
 
 const AGENCY_NAME_RE = /(recruit|staffing|manpower|headhunt|executive search|talent (solutions|acquisition|partners|hub)|human resources?|\bhr (solutions|consult|services|partner)|personnel|resourcing|employment (agency|services)|\bagency\b|job (portal|board)|outsourc|randstad|adecco|kelly services|robert walters|michael page|persolkelly|reeracoen|adia\b|aquarius|hays\b|spring professional|alpha consulting|talentvis|jac recruitment)/i;
-const AGENCY_TEXT_RE = /(on behalf of (our|a|an) (client|company)|our client (is|has|requires)|EA licen[cs]e|EA no\.?|licen[cs]e no\.?\s*:?\s*\d{2}[A-Z]\d{4}|EA reg(istration)? ?(no|number)|personnel registration|we are (a|an) (leading )?(recruit|staffing|executive search))/i;
-const EXCLUDED_SECTOR_RE = /(insuran|assurance|financial (advis|plann|service)|wealth (manage|plan)|\bbank\b|banking|moneylend|licensed money|securities|fund manage|\bfa firm\b|\bmas[- ]licensed|ministry of|\bgovernment\b|statutory board)/i;
+const AGENCY_TEXT_RE = /(on behalf of (our|a|an) (client|company)|our client (is|has|requires)|EA licen[cs]e|EA no\.?|licen[cs]e no\.?\s*:?\s*\d{2}[A-Z]\d{4}|EA reg(istration)? ?(no|number)|personnel registration|name of authority|option period|outsourced (staff|manpower)|manpower (supply|outsourcing)|we are (a|an) (leading )?(recruit|staffing|executive search))/i;
+const EXCLUDED_SECTOR_RE = /(insuran|assurance|financial (advis|plann|service)|wealth (manage|plan)|\bbank\b|banking|moneylend|licensed money|securities|fund manage|\bfa firm\b|\bmas[- ]licensed|ministry of|\bgovernment\b|statutory board|family office|private (bank|equity|wealth)|asset manage|hedge fund|venture capital|town council|\bmcst\b|management corporation|\bcouncil\b|\bhdb\b|polytechnic|\buniversity\b)/i;
 const LARGE_ENTERPRISE_RE = /(multinational|\bmnc\b|fortune 500|publicly[- ]listed|sgx[- ]listed|nasdaq|nyse|global leader|worldwide offices)/i;
 
 const SECTOR_RULES = [
@@ -143,6 +143,7 @@ function nameSubsetMatch(a, b) {
 
 function guessBusinessName(title, host) {
   if (!title) return null;
+  if (/^\s*(https?:\/\/)?[a-z0-9-]+(\.[a-z0-9-]+)+\/?\s*$/i.test(title)) return null; // a bare domain is not a business name
   const parts = String(title).split(/\s[|\-–—:•·]\s|\s[|]\s|\|/).map((s) => s.trim()).filter(Boolean);
   const label = domainLabel(host);
   for (const p of parts) {
@@ -165,6 +166,14 @@ function inferYear(m, d, today) {
   return iso;
 }
 /** all dates in text with their index. Day-first (SG convention) for numeric forms. */
+function decodeEntities(t) { return String(t || '').replace(/&amp;/g, '&').replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, ' ').replace(/&#8211;|&ndash;/g, '-').replace(/\s+/g, ' ').trim(); }
+function brandFromHtml(html, host, fallbackTitle) {
+  const h = String(html || '');
+  const og = (h.match(/<meta[^>]+property=["']og:site_name["'][^>]*content=["']([^"']+)/i) || h.match(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:site_name["']/i) || [])[1];
+  const title = (h.match(/<title[^>]*>([^<]+)/i) || [])[1];
+  for (const cand of [og, title, fallbackTitle]) { const g = guessBusinessName(decodeEntities(cand), host); if (g) return g; }
+  return og && domainMatchesName(host, decodeEntities(og)) && !/\.[a-z]{2,}$/i.test(og) ? decodeEntities(og) : null;
+}
 function findDates(text, today) {
   const out = [];
   const t = String(text || '');
@@ -191,20 +200,28 @@ function findDates(text, today) {
   }
   return out;
 }
-const DEADLINE_KW = /(until|till|til|by|ends?|ending|expires?|expiry|valid(?:\s+(?:until|till|through|to))?|deadline|before|closes?|closing|last day|to|through|–|—|-)\s*[:,]?\s*$/i;
+const DEADLINE_KW = /(until|till|til|by|ends?|ended|ending|expires?|expired|expiry|valid(?:\s+(?:until|till|through|to))?|deadline|before|closes?|closing|last day|to|through|–|—|-)(?:\s+(?:on|at|the))?\s*[:,]?\s*$/i;
 const DEADLINE_CTX = /(promo|offer|early.?bird|enrol|registration|register|trial|discount|deadline|ends|until|till|valid|expires?|closing|last day|special|limited)/i;
-/** The latest date that is explicitly framed as an end/deadline. null if none. */
-function extractDeadline(text, today) {
+/** Framed end/deadline dates, split into upcoming (>= today) and expired. */
+function framedDeadlines(text, today) {
   const t = String(text || '');
-  const found = findDates(t, today).filter((d) => {
+  const dates = findDates(t, today).filter((d) => {
     const before = t.slice(Math.max(0, d.index - 40), d.index);
     if (!DEADLINE_KW.test(before)) return false;
-    const around = t.slice(Math.max(0, d.index - 140), d.index + 140);
-    return DEADLINE_CTX.test(around);
-  });
-  if (!found.length) return null;
-  found.sort((a, b) => (a.date < b.date ? 1 : -1));
-  return found[0].date;
+    return DEADLINE_CTX.test(t.slice(Math.max(0, d.index - 140), d.index + 140));
+  }).map((d) => d.date);
+  const uniq = Array.from(new Set(dates)).sort();
+  return { upcoming: uniq.filter((d) => d >= today), expired: uniq.filter((d) => d < today) };
+}
+/** Nearest upcoming deadline. If the page also shows an expired promo date and the "upcoming" one is >90 days away
+ *  (likely an unrelated term/schedule date), treat the offer as expired. Only-expired -> latest expired. null if none. */
+function extractDeadline(text, today) {
+  const { upcoming, expired } = framedDeadlines(text, today);
+  if (upcoming.length) {
+    if (expired.length && daysBetween(today, upcoming[0]) > 90) return expired[expired.length - 1];
+    return upcoming[0];
+  }
+  return expired.length ? expired[expired.length - 1] : null;
 }
 
 /* ---------- contact extraction (public business contact on company's own pages) ---------- */
@@ -217,7 +234,8 @@ function extractContacts(text, host) {
   const emails = unique((t.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g) || [])
     .map((e) => e.toLowerCase().replace(/[.,;]+$/, ''))
     .filter((e) => !/\.(png|jpe?g|gif|svg|webp)$/.test(e) && !/(sentry|wixpress|example\.com|domain\.com|yourname|email@|name@)/.test(e)));
-  emails.sort((a, b) => (host && b.endsWith('@' + host) ? 1 : 0) - (host && a.endsWith('@' + host) ? 1 : 0));
+  const rank = (e) => (/^(info|enquir|inquir|contact|hello|admin|learn|sales|support|reception|appointment|booking)/.test(e) ? 2 : 0) + (host && e.endsWith('@' + host) ? 1 : 0) - (/^(partner|career|hr@|recruit|job|press|media|invest|legal|privacy|dpo)/.test(e) ? 3 : 0);
+  emails.sort((a, b) => rank(b) - rank(a));
   const wa = (t.match(/(?:wa\.me\/|api\.whatsapp\.com\/send\?phone=|whatsapp\.com\/send\?phone=)\+?(\d{8,12})/i) || [])[1];
   return { phone: phones[0] || null, email: emails[0] || null, whatsapp: wa ? '+' + wa : null };
 }
@@ -225,7 +243,7 @@ function extractContacts(text, host) {
 /* ---------- classification ---------- */
 function classifyText(text, hasDeadline) {
   const t = String(text || '').toLowerCase();
-  if (/(new (branch|outlet|centre|center|clinic|studio|location|campus)|grand opening|now open|opening soon|officially open|we(?:'|’)?ve (moved|opened)|newly opened)/.test(t)) return 'New branch / expansion';
+  if (/(new (branch|outlet|centre|center|clinic|studio|location|campus)|grand opening|opening soon|officially open(ed)?|now open (at|in) |we(?:'|’)?ve (moved|opened)|newly opened)/.test(t)) return 'New branch / expansion';
   if (/2027/.test(t) && /(enrol|registration|register|admission|intake)/.test(t)) return '2027 enrolment campaign';
   if (/(trial (class|lesson|session)|free trial|book a trial|trial booking)/.test(t)) return 'Trial booking campaign';
   if (/(early.?bird|promo|promotion|% off|discount|free consultation|special offer|limited time)/.test(t)) return hasDeadline ? 'Promotion deadline' : 'Other active demand';
@@ -251,6 +269,15 @@ function inferSector(text) {
   for (const [sector, re] of SECTOR_RULES) if (re.test(text || '')) return sector;
   return 'Other';
 }
+function countMatches(re, text) { return (String(text || '').match(new RegExp(re.source, 'gi')) || []).length; }
+/** Sector from identity first (industry code, name, domain), then job/page title, and only then repeated body keywords. */
+function inferSectorFor(c) {
+  const stages = [[c.industryHint, c.business, c.domain].join(' '), [c.role, c.title].join(' ')];
+  for (const t of stages) { const s = inferSector(t); if (s !== 'Other') return s; }
+  let best = 'Other', bestN = 2; // body keywords only count when repeated (>=3 hits)
+  for (const [sector, re] of SECTOR_RULES) { const n = countMatches(re, c.evidenceText + ' ' + (c.pageText || '')); if (n > bestN) { best = sector; bestN = n; } }
+  return best;
+}
 function isAgency(name, text) {
   return AGENCY_NAME_RE.test(name || '') || AGENCY_TEXT_RE.test(text || '');
 }
@@ -258,7 +285,7 @@ function isSingapore(c) {
   if (c.source === 'mcf') return true;
   const host = c.domain || hostOf(c.website) || hostOf(c.evidenceUrl) || '';
   if (/\.sg$/.test(host)) return true;
-  const t = [c.evidenceText, c.title, c.business, c.phone].join(' ');
+  const t = [c.evidenceText, c.title, c.business, c.phone, String(c.pageText || '').slice(0, 6000)].join(' ');
   return /(\bsingapore\b|\+65|\(65\)|\b65 ?[689]\d{3} ?\d{4}\b|\bs\(?\d{6}\)?\b)/i.test(t);
 }
 
@@ -317,6 +344,19 @@ function normaliseSearchResult(r, ctx) {
   };
 }
 /** Fold fetched page content into a candidate. `page` = {status, body}. */
+function signalExcerpt(text, deadline, today) {
+  let at = -1;
+  if (deadline) {
+    const hit = findDates(text, today).find((d) => d.date === deadline && DEADLINE_KW.test(text.slice(Math.max(0, d.index - 40), d.index)));
+    if (hit) at = hit.index;
+  }
+  if (at < 0) at = text.search(/(early.?bird|promo|2027|enrol|registration|trial|grand opening|now open)/i);
+  if (at < 0) return '';
+  const from = Math.max(0, at - 160);
+  let ex = text.slice(from, at + 260).replace(/\s+/g, ' ').trim();
+  if (from > 0) ex = ex.replace(/^\S*\s+/, ''); // drop a possibly cut first word
+  return ex;
+}
 function enrichFromPage(c, page, today) {
   const out = Object.assign({}, c);
   const ok = page && page.status >= 200 && page.status < 300 && typeof page.body === 'string';
@@ -331,11 +371,9 @@ function enrichFromPage(c, page, today) {
   if (deadline) out.deadline = deadline;
   const cls = classifyText(text, !!out.deadline);
   if (cls) { out.pageSignal = cls; }
-  if (!out.business) {
-    const t = (text.match(/<title>([^<]+)/i) || [])[1] || out.title;
-    out.business = guessBusinessName(out.title || t, host);
-  }
+  if (!out.business) out.business = brandFromHtml(page.body, host, out.title);
   out.evidenceVerified = !!cls && text.length > 200;
+  if (out.evidenceVerified && String(out.evidenceText || '').length < 120) { const ex = signalExcerpt(text, out.deadline, today); if (ex) out.evidenceText = clip(`${out.title && !/^[a-z0-9-]+(\.[a-z0-9-]+)+\.?$/i.test(out.title.trim()) ? out.title + '. ' : ''}${ex}`, 900); }
   return out;
 }
 
@@ -367,6 +405,8 @@ const DUTY_CATS = [
   /(registration|enrol)/i, /follow.?up/i, /reminder/i, /\bfaqs?\b/i, /(front.?desk|reception)/i, /customer (service|support|care)/i,
 ];
 const DUTY_URGENT = /(whatsapp|enquir|inquir|phone|\bcalls?\b|appointment|booking|schedul)/i;
+const URGENT_GROUPS = [/whatsapp/i, /(enquir|inquir)/i, /(phone|\bcalls?\b)/i, /(appointment|booking|schedul)/i];
+const ROLE_ENQUIRY = /(receptionist|front.?desk|customer (service|support|care)|appointment|booking|enquir|coordinator|client relations)/i;
 function scoreCandidate(c, today) {
   const text = [c.role, c.evidenceText, c.pageText].filter(Boolean).join(' ');
   const parts = {};
@@ -376,14 +416,15 @@ function scoreCandidate(c, today) {
   const dl = c.deadline ? daysBetween(today, c.deadline) : null;
   switch (c.signalType) {
     case 'Hiring enquiry staff':
-      urgency = DUTY_URGENT.test(text) ? 35 : 28; why.push(urgency === 35 ? 'hiring role names enquiry/phone/WhatsApp/appointment duties' : 'generic admin/CS hire'); break;
+      urgency = (ROLE_ENQUIRY.test(c.role || '') && DUTY_URGENT.test(text)) || URGENT_GROUPS.filter((re) => re.test(text)).length >= 2 ? 35 : 28; why.push(urgency === 35 ? 'hiring role names enquiry/phone/WhatsApp/appointment duties' : 'generic admin/CS hire'); break;
     case 'New branch / expansion': {
       const age = c.signalDate ? daysBetween(c.signalDate, today) : null;
       urgency = age !== null && age <= SS.expansionWindowDays ? 30 : 20; why.push(urgency === 30 ? 'new location within 60 days' : 'expansion, date unconfirmed/older'); break; }
     case 'Customer-service bottleneck': urgency = 22; why.push('customer-service bottleneck evidence'); break;
     case 'Booking workflow signal': urgency = 15; why.push('booking channel only'); break;
     default:
-      if (dl !== null && dl >= 0 && dl <= 30) { urgency = 32; why.push(`campaign deadline in ${dl}d`); }
+      if (dl !== null && dl >= 0 && dl <= 14) { urgency = 35; why.push(`campaign deadline in ${dl}d (<=14d)`); }
+      else if (dl !== null && dl >= 0 && dl <= 30) { urgency = 32; why.push(`campaign deadline in ${dl}d`); }
       else { urgency = 26; why.push('active enrolment/trial/promo campaign'); }
   }
   const extra = Math.max(0, (c.signalCount || 1) - 1);
@@ -540,7 +581,7 @@ function validateBrief(brief, c) {
   if (errs.length) return { ok: false, errors: errs };
   const evidence = [c.evidenceText, c.pageText, c.business, c.role, c.signalDate, c.deadline, c.evidenceUrl, c.phone, c.email, c.website].join(' ');
   const allowed = new Set(numbersIn(evidence).concat(['2026', '2027']));
-  const all = need.map((k) => brief[k]).join(' ');
+  const all = need.map((k) => brief[k]).join(' ').replace(/https?:\/\/\S+/gi, ' '); // URLs (percent-encoding, ids) are not claims
   for (const n of numbersIn(all)) if (!allowed.has(n)) { errs.push('unsupported_number:' + n); break; }
   if (FORBIDDEN_CLAIM_RE.test(all)) errs.push('forbidden_claim');
   if (!/^hypothesis/i.test(brief.problem.trim()) && !/(evidence|advert|listing|page)/i.test(brief.problem)) errs.push('problem_not_labelled_hypothesis');
@@ -620,7 +661,7 @@ function processCandidates(raw, existing, existingRawKeys, opts) {
   const survivors = [];
   for (const c0 of raw) {
     const c = Object.assign({}, c0);
-    if (!c.sector) c.sector = inferSector([c.industryHint, c.business, c.domain, c.title, c.evidenceText].join(' '));
+    if (!c.sector) c.sector = inferSectorFor(c);
     if (!c.signalType) {
       c.signalType = (c.pipeline === 'A' ? classifyHiring(c.evidenceText) : null) || c.pageSignal || classifyText(c.evidenceText, !!c.deadline) || null;
       if (!c.signalType) { rejected.push(reject(c, ['no_relevant_signal'])); continue; }
@@ -632,7 +673,18 @@ function processCandidates(raw, existing, existingRawKeys, opts) {
     if (reasons.length) { rejected.push(reject(c, reasons)); continue; }
     survivors.push(c);
   }
-  const merged = mergeCandidates(survivors);
+  const textOwner = new Map();
+  const unique = [];
+  for (const c of survivors) {
+    if (c.source !== 'mcf') { unique.push(c); continue; }
+    const body = String(c.evidenceText || '').slice((c.title || '').length).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 300);
+    const key = body.length > 120 ? hash(body) : null;
+    const owner = key ? textOwner.get(key) : null;
+    if (key && owner && owner !== nameSlug(c.business)) { rejected.push(reject(c, ['duplicate_posting_text'])); continue; }
+    if (key && !owner) textOwner.set(key, nameSlug(c.business));
+    unique.push(c);
+  }
+  const merged = mergeCandidates(unique);
   const idx = buildExistingIndex(existing);
   const rawSeen = new Set(existingRawKeys || []);
   for (const p of existing || []) { const u = (p.fields || p)['Evidence URL']; if (u) rawSeen.add(rawSignalKey({ evidenceUrl: u })); }
@@ -656,19 +708,33 @@ function processCandidates(raw, existing, existingRawKeys, opts) {
     const scored = scoreCandidate(c, today);
     scoredList.push({ c, scored });
   }
-  scoredList.sort((a, b) => b.scored.total - a.scored.total);
+  scoredList.sort((a, b) => (b.scored.total - a.scored.total) || (b.scored.parts.urgency - a.scored.parts.urgency) || ((a.c.pipeline === 'A' ? 1 : 0) - (b.c.pipeline === 'A' ? 1 : 0)));
   const accepted = [];
-  for (const { c, scored } of scoredList) {
+  // outcome per candidate (before the daily cap), then cap with a reserved slice for non-hiring signals
+  const outcomeOf = (c, scored) => {
     const total = scored.total;
     const unverified = !c.evidenceVerified;
+    const noRoute = !(c.website || c.phone || c.email || c.whatsapp);
     let outcome;
-    if (unverified || scored.undated) outcome = total >= o.researchMin ? 'research' : 'reject';
+    if (unverified || scored.undated || noRoute) outcome = total >= o.researchMin ? 'research' : 'reject';
     else if (total >= o.priorityMin) outcome = 'priority';
     else if (total >= o.secondaryMin) outcome = 'secondary';
     else if (total >= o.researchMin) outcome = 'research';
     else outcome = 'reject';
-    const why = unverified ? 'source_page_not_verified' : scored.undated ? 'undated_campaign' : null;
-    if ((outcome === 'priority' || outcome === 'secondary') && accepted.length >= o.maxNewProspects) { outcome = 'research'; metrics.capped++; }
+    const why = unverified ? 'source_page_not_verified' : scored.undated ? 'undated_campaign' : noRoute ? 'no_public_contact_route' : null;
+    return { outcome, why };
+  };
+  const decided = scoredList.map((x) => Object.assign({}, x, outcomeOf(x.c, x.scored)));
+  const eligible = decided.filter((x) => x.outcome === 'priority' || x.outcome === 'secondary');
+  const reserveN = o.reserveNonHiring === undefined ? 5 : o.reserveNonHiring;
+  const reserved = eligible.filter((x) => x.c.pipeline !== 'A').slice(0, Math.min(reserveN, o.maxNewProspects));
+  const rest = eligible.filter((x) => !reserved.includes(x));
+  const chosen = new Set(reserved.concat(rest.slice(0, Math.max(0, o.maxNewProspects - reserved.length))));
+  for (const d of decided) {
+    const { c, scored, why } = d;
+    const total = scored.total;
+    let outcome = d.outcome;
+    if ((outcome === 'priority' || outcome === 'secondary') && !chosen.has(d)) { outcome = 'research'; metrics.capped++; }
     if (outcome === 'priority' || outcome === 'secondary') {
       accepted.push({ c, scored, tier: outcome });
       metrics[outcome === 'priority' ? 'accepted' : 'secondary']++;
@@ -683,7 +749,7 @@ function processCandidates(raw, existing, existingRawKeys, opts) {
     } else if (outcome === 'research') {
       metrics.research++;
       const key = rawSignalKey(c);
-      if (!rawSeen.has(key)) { rawSeen.add(key); rawRows.push({ fields: rawFields(c, 'Needs validation', { today, batch }, { score: total, reason: why || (metrics.capped && accepted.length >= o.maxNewProspects ? 'daily_cap_reached' : 'score_50_69_research_required') }) }); }
+      if (!rawSeen.has(key)) { rawSeen.add(key); rawRows.push({ fields: rawFields(c, 'Needs validation', { today, batch }, { score: total, reason: why || (d.outcome === 'priority' || d.outcome === 'secondary' ? 'daily_cap_reached' : 'score_50_69_research_required') }) }); }
     } else {
       rejected.push(reject(c, ['score_below_50']));
       const key = rawSignalKey(c);
@@ -785,11 +851,15 @@ export {
   guessBusinessName,
   findDates,
   extractDeadline,
+  framedDeadlines,
+  brandFromHtml,
+  decodeEntities,
   extractContacts,
   classifyText,
   classifyHiring,
   applyIdentity,
   inferSector,
+  inferSectorFor,
   isAgency,
   isSingapore,
   normaliseMCF,

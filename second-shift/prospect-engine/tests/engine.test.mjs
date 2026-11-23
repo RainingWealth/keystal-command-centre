@@ -163,7 +163,7 @@ test('scoring golden cases', () => {
 });
 
 test('tiering: <50 not queued; 50-69 research raw row; cap at maxNewProspects', () => {
-  const mk = (i) => ({ pipeline: 'A', source: 'mcf', signalType: 'Hiring enquiry staff', sourceType: 'Job listing', business: 'Alpha Studio ' + 'X'.repeat(i + 1) + ' Pte Ltd', uen: '2020000' + String(i).padStart(2, '0') + 'Z', role: 'Receptionist', evidenceText: 'phone whatsapp enquiries appointment', evidenceUrl: 'https://www.mycareersfuture.gov.sg/job/' + i, signalDate: '2026-11-20', evidenceVerified: true, sector: 'Healthcare' });
+  const mk = (i) => ({ pipeline: 'A', source: 'mcf', signalType: 'Hiring enquiry staff', sourceType: 'Job listing', business: 'Alpha Studio ' + 'X'.repeat(i + 1) + ' Pte Ltd', uen: '2020000' + String(i).padStart(2, '0') + 'Z', website: `https://alpha${i}.sg/`, domain: `alpha${i}.sg`, role: 'Receptionist', evidenceText: 'phone whatsapp enquiries appointment', evidenceUrl: 'https://www.mycareersfuture.gov.sg/job/' + i, signalDate: '2026-11-20', evidenceVerified: true, sector: 'Healthcare' });
   const r = run(Array.from({ length: 30 }, (_, i) => mk(i)), [], [], { maxNewProspects: 20 });
   assert.equal(r.accepted.length, 20);
   assert.equal(r.metrics.capped, 10);
@@ -252,4 +252,113 @@ test('Perplexity hiring fallback: job-board result needs a grounded employer nam
   const out = run([c]);
   assert.equal(out.accepted.length, 0, 'job-board page is unverified -> cannot be a Prospect');
   assert.equal(out.rawRows.filter((x) => x.fields['Reject Reason'] === 'source_page_not_verified').length, 1);
+});
+
+test('sector: identity beats body noise; town council / statutory bodies excluded', () => {
+  assert.equal(E.inferSectorFor({ business: 'DYNAMIC SAFETY PTE. LTD.', industryHint: 'SAFETY CONSULTANCY', title: 'Office Receptionist', evidenceText: 'handle calls; support students and learning' }), 'Other');
+  assert.equal(E.inferSectorFor({ business: 'Acme Trading Pte Ltd', title: 'Receptionist', evidenceText: 'one student, one school visit' }), 'Other');
+  assert.equal(E.inferSectorFor({ business: 'Smilepoint Dental Centre', title: 'Front Desk', evidenceText: '' }), 'Healthcare');
+  assert.equal(E.inferSectorFor({ business: 'Plain Co', title: 'Admin', evidenceText: 'clinic clinic clinic dental patients' }), 'Healthcare');
+  const r = run([{ ...mcf()[0], business: 'NEE SOON TOWN COUNCIL', domain: 'nstc.org.sg', website: 'https://nstc.org.sg/', uen: '1', postedByAgency: false, signalDate: '2026-11-20' }]);
+  assert.equal(r.metrics.rejectReasons.excluded_sector, 1);
+});
+
+test('templated postings: sibling shell entities with identical text yield one prospect, repeats of one employer still merge', () => {
+  const body = 'Greeting and welcoming clients, answering phone calls and WhatsApp enquiries, booking appointments for the outlet team and handling payments at the front counter. '.repeat(3);
+  const mk = (name, uen) => ({ website: `https://shell${uen.toLowerCase()}.sg/`, domain: `shell${uen.toLowerCase()}.sg`, pipeline: 'A', source: 'mcf', signalType: 'Hiring enquiry staff', sourceType: 'Job listing', business: name, uen, role: 'Receptionist (Beauty & Wellness)', title: 'Receptionist (Beauty & Wellness)', evidenceText: 'Receptionist (Beauty & Wellness). ' + body, evidenceUrl: 'https://www.mycareersfuture.gov.sg/job/' + uen, signalDate: '2026-11-22', evidenceVerified: true });
+  const r = run([mk('SJ 1 PTE. LTD.', '1A'), mk('SJ 4 PTE. LTD.', '4A'), mk('JHL PTE. LTD.', '9A'), mk('SJ 1 PTE. LTD.', '1A')]);
+  assert.equal(r.metrics.rejectReasons.duplicate_posting_text, 2);
+  assert.equal(r.accepted.length, 1);
+  assert.equal(r.accepted[0].c.business, 'SJ 1 PTE. LTD.');
+});
+
+test('urgency 35 needs role-level or multi-group enquiry duties, not one stray keyword', () => {
+  const base = { signalType: 'Hiring enquiry staff', sector: 'Other', signalDate: '2026-11-22', signalCount: 1 };
+  assert.equal(E.scoreCandidate({ ...base, role: 'Digital marketing executive', evidenceText: 'manage social media; occasional phone follow-up' }, TODAY).parts.urgency, 28);
+  assert.equal(E.scoreCandidate({ ...base, role: 'Receptionist', evidenceText: 'answer phone calls' }, TODAY).parts.urgency, 35);
+  assert.equal(E.scoreCandidate({ ...base, role: 'Admin executive', evidenceText: 'handle WhatsApp enquiries and book appointments' }, TODAY).parts.urgency, 35);
+});
+
+test('no public contact route -> research-required only, never a Prospect', () => {
+  const c = { pipeline: 'A', source: 'mcf', signalType: 'Hiring enquiry staff', sourceType: 'Job listing', business: 'Quiet Dental Pte Ltd', uen: '5Q', role: 'Dental Receptionist', title: 'Dental Receptionist', sector: 'Healthcare', evidenceText: 'Dental Receptionist. phone calls, WhatsApp enquiries, appointment booking', evidenceUrl: 'https://www.mycareersfuture.gov.sg/job/5q', signalDate: '2026-11-22', evidenceVerified: true };
+  const r = run([c]);
+  assert.equal(r.accepted.length, 0);
+  assert.equal(r.rawRows.filter((x) => x.fields['Reject Reason'] === 'no_public_contact_route').length, 1);
+  const withSite = run([{ ...c, website: 'https://quietdental.sg/', domain: 'quietdental.sg' }]);
+  assert.equal(withSite.accepted.length, 1);
+});
+
+test('financial / family-office employers are excluded from the Second Shift queue', () => {
+  const r = run([{ ...mcf()[0], business: 'RAFFLES FAMILY OFFICE PTE. LTD.', domain: 'rafflesgroup.co', website: 'https://rafflesgroup.co/', uen: '7R', signalDate: '2026-11-22' }]);
+  assert.equal(r.metrics.rejectReasons.excluded_sector, 1);
+});
+
+test('real-page patterns: og:site_name brand, bare-domain titles rejected, page text proves Singapore', () => {
+  const html = '<html><head><title>tll open house</title><meta property="og:site_name" content="The Learning Lab"></head><body>' + 'Enrolment for 2027 registration is open. Call +65 6733 8711. Early registration valid until 31 Dec 2026. '.repeat(4) + '</body></html>';
+  const c = E.enrichFromPage(E.normaliseSearchResult({ title: 'tll open house', url: 'https://www.thelearninglab.com.sg/tll-open-house' }, { pipeline: 'B' }), { status: 200, body: html }, TODAY);
+  assert.equal(c.business, 'The Learning Lab');
+  assert.equal(c.deadline, '2026-12-31');
+  assert.equal(E.guessBusinessName('lilbutmightyenglish.com', 'lilbutmightyenglish.com'), null);
+  const nosg = E.enrichFromPage(E.normaliseSearchResult({ title: 'Little Stars | Lil Stars English', url: 'https://lilstars.com/page' }, { pipeline: 'B' }), { status: 200, body: '<title>Lil Stars</title>' + 'We teach English in Singapore, near Tampines MRT. Registration for 2027 is open, enrol now. '.repeat(5) }, TODAY);
+  assert.equal(E.isSingapore(nosg), true);
+});
+
+test('"registration now open" is an enrolment campaign, not a new branch', () => {
+  assert.equal(E.classifyText('AY2027 registration now open - enrol your child for 2027', true), '2027 enrolment campaign');
+  assert.equal(E.classifyText('Grand opening of our new outlet in Tampines', false), 'New branch / expansion');
+  assert.equal(E.classifyText('We are now open at Jurong East', false), 'New branch / expansion');
+});
+
+test('deadline semantics: nearest upcoming; expired promo + far-future unrelated date => offer treated as expired', () => {
+  assert.equal(E.extractDeadline('Early bird valid until 15 Dec 2026. Offer ends 31 Jan 2027 for existing students', TODAY), '2026-12-15');
+  assert.equal(E.extractDeadline('Early Bird Promotion ends on October 31, 2026. Term fees valid until 31 Mar 2027 per the schedule', TODAY), '2026-10-31');
+  assert.equal(E.extractDeadline('Early bird promotion ended 31 Oct 2026', TODAY), '2026-10-31');
+  assert.equal(E.extractDeadline('No dates here', TODAY), null);
+});
+
+test('scoring: campaign deadline within 14 days is maximum urgency; ties favour non-hiring pipelines', () => {
+  const camp = { signalType: '2027 enrolment campaign', evidenceText: 'enrol now', sector: 'Education', website: 'https://b.sg/', deadline: '2026-11-30', signalCount: 1 };
+  assert.equal(E.scoreCandidate(camp, TODAY).parts.urgency, 35);
+  assert.equal(E.scoreCandidate({ ...camp, deadline: '2026-12-20' }, TODAY).parts.urgency, 32);
+  const mkA = (n) => ({ pipeline: 'A', source: 'mcf', signalType: 'Hiring enquiry staff', sourceType: 'Job listing', business: 'Hire Co ' + n + ' Pte Ltd', uen: 'H' + n, website: `https://hire${n}.sg/`, domain: `hire${n}.sg`, role: 'Receptionist', title: 'Receptionist', sector: 'Education', evidenceText: 'Receptionist. Handle phone calls only.', evidenceUrl: 'https://www.mycareersfuture.gov.sg/job/h' + n, signalDate: '2026-11-22', evidenceVerified: true });
+  const b = { pipeline: 'B', source: 'web-search', signalType: '2027 enrolment campaign', sourceType: 'Company website', business: 'Camp Centre', website: 'https://campcentre.sg/', domain: 'campcentre.sg', sector: 'Education', evidenceText: 'enrol 2027 registration trial enquiries phone', evidenceUrl: 'https://campcentre.sg/2027', deadline: '2026-11-30', signalDate: '2026-11-20', evidenceVerified: true };
+  const r = run([mkA(1), mkA(2), mkA(3), b], [], [], { maxNewProspects: 2 });
+  assert.ok(r.accepted.some((a) => a.c.business === 'Camp Centre'), 'campaign must make the cut at equal score');
+});
+
+test('daily cap keeps up to 5 slots for verified non-hiring signals that clear the 70 bar', () => {
+  const mkA = (i) => ({ pipeline: 'A', source: 'mcf', signalType: 'Hiring enquiry staff', sourceType: 'Job listing', business: 'Aaa Clinic ' + 'Q'.repeat(i + 1) + ' Pte Ltd', uen: 'A' + i, website: `https://aaa${i}.sg/`, domain: `aaa${i}.sg`, role: 'Receptionist', title: 'Receptionist', sector: 'Healthcare', evidenceText: 'Receptionist. phone calls, WhatsApp enquiries, appointment booking', evidenceUrl: 'https://www.mycareersfuture.gov.sg/job/a' + i, signalDate: '2026-11-22', evidenceVerified: true });
+  const mkB = (i) => ({ pipeline: 'B', source: 'web-search', signalType: '2027 enrolment campaign', sourceType: 'Company website', business: 'Bee Centre ' + 'Z'.repeat(i + 1), website: `https://bee${i}.sg/`, domain: `bee${i}.sg`, sector: 'Education', evidenceText: 'enrol 2027', evidenceUrl: `https://bee${i}.sg/2027`, deadline: '2026-12-20', signalDate: '2026-11-20', evidenceVerified: true });
+  const r = run([...Array.from({ length: 25 }, (_, i) => mkA(i)), mkB(1), mkB(2), mkB(3)], [], [], { maxNewProspects: 20 });
+  assert.equal(r.accepted.length, 20);
+  assert.equal(r.accepted.filter((a) => a.c.pipeline === 'B').length, 3);
+  assert.equal(r.metrics.capped, 8);
+});
+
+test('outsourced-contract postings ("Name of Authority", option period) are treated as manpower vendors', () => {
+  const c = { ...mcf()[0], business: 'ALBEDO DESIGN PTE. LTD.', domain: 'albedodesign.com.sg', website: 'https://albedodesign.com.sg/', uen: '9X', postedByAgency: false, signalDate: '2026-11-22', evidenceText: 'Administration Assistant. Name of Authority: Evergreen Secondary School. Contract Period: 1 Jan-31 Dec 2027. Option period: 1 Jan-31 Dec 2028' };
+  assert.equal(run([c]).metrics.rejectReasons.recruitment_agency, 1);
+});
+
+test('first-party campaign page: weak snippet is replaced by an excerpt around the deadline', () => {
+  const body = '<html><head><title>Lil Stars English | AY2027</title></head><body>' + 'Learn English with us in Singapore. '.repeat(10) + 'Your Search Ends Here - Early Bird Promo Extended to 30 November 2026! Waived registration fee for 2027 enrolment. ' + 'Contact us. '.repeat(20) + '</body></html>';
+  const c = E.enrichFromPage(E.normaliseSearchResult({ title: 'lilstars.sg', url: 'https://lilstars.sg/ay2027' }, { pipeline: 'B' }), { status: 200, body }, TODAY);
+  assert.equal(c.deadline, '2026-11-30');
+  assert.match(c.evidenceText, /Early Bird Promo Extended to 30 November 2026/);
+});
+
+test('grounding check ignores URLs (percent-encoding / ids) but still blocks real percentage claims', () => {
+  const c = { business: 'Clinic Co', signalType: 'Hiring enquiry staff', role: 'Admin', sector: 'Healthcare', evidenceText: 'Admin for the clinic', evidenceUrl: 'https://www.mycareersfuture.gov.sg/job/admin-%E2%80%93-clinic-99ab', signalDate: '2026-11-19' };
+  const good = { ...E.templateBrief(c, TODAY), whyNow: 'Observed (listing dated 2026-11-19): Clinic Co is recruiting. Source: ' + c.evidenceUrl };
+  assert.equal(E.validateBrief(good, c).ok, true);
+  assert.equal(E.validateBrief({ ...good, value: 'You will cut costs by 30% quickly.' }, c).ok, false);
+});
+
+test('contact extraction prefers generic enquiry mailboxes and drops a cut first word from excerpts', () => {
+  const c = E.extractContacts('Write to partnerships@brand.sg or careers@brand.sg or info@brand.sg', 'brand.sg');
+  assert.equal(c.email, 'info@brand.sg');
+  const body = '<html><head><title>Kids Co | Singapore</title></head><body>' + 'We run classes in Singapore. '.repeat(12) + 'abcd Class Start Time 0900hrs Submit Your Search Ends Here - Early Bird Promo Extended to 30 November 2026! Register now. ' + 'Contact us. '.repeat(30) + '</body></html>';
+  const e = E.enrichFromPage(E.normaliseSearchResult({ title: 'Kids Co | Singapore', url: 'https://kidsco.sg/x' }, { pipeline: 'B' }), { status: 200, body }, TODAY);
+  assert.match(e.evidenceText, /Early Bird Promo Extended to 30 November 2026/);
+  assert.doesNotMatch(e.evidenceText, /^\w{1,3}\s/);
 });
