@@ -1,0 +1,21 @@
+THE PARTNER WHO NEVER CAME BACK: third-party material in the film
+
+MUSIC (all sampled instruments; the score and all sound effects are original and synthesised in code)
+Piano: "Salamander Grand Piano V3" by Alexander Holm, licensed under CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/)
+Samples (CC0): VS Chamber Orchestra: Community Edition (Versilian Studios), Versilian Community Sample Library (Versilian Studios)
+
+VOICE
+Kokoro-82M text-to-speech (model and voices by hexgrad; ONNX export by Taylor Chu), Apache License 2.0, run offline through kokoro-onnx (MIT).
+Voices used: bm_george (narrator), bm_lewis (Daniel), bm_daniel (Aaron), bf_emma (Sarah), bf_alice (hospital call), bf_isabella (accountant), bm_fable (estate representative). All lines are synthetic speech; no real person's voice is used.
+Speech check: faster-whisper (MIT) with the base.en model.
+
+TYPE
+Cormorant Garamond by Christian Thalmann (Catharsis Fonts), SIL Open Font License 1.1 (fonts/OFL-Cormorant.txt).
+
+PICTURE
+Photoreal cut (main film): 25 stills generated on 2026-11-23 with Gamma's AI image generator (type "photo", model not disclosed by the service). They are generated images of fictional people, not photographs; no real person, brand or place is depicted. Prompts and the three regenerated images are documented in assets/photo/PROMPTS.md. Overlays (paper text cards, captions, end card, the framed light box) are drawn in code.
+Paper-cut alternate cut: drawn entirely in code (Canvas 2D); no stock footage or photographs.
+
+PRODUCTION ENGINE
+Lemo-Opuscar library (page contract, frame capture, TTS and speech-check tools, sampler, mux and loudness mastering), code under the MIT licence; the "Paper-cut Lightbox" style guide that this project's look follows is by Lemomo (LemoLab), CC BY-NC 4.0, used under the library's permission for making films: https://github.com/lemomo-ai/lemo-opuscar
+ffmpeg (GPL build, BtbN) for encoding.
