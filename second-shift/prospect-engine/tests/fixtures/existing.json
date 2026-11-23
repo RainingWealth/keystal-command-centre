@@ -1,0 +1,7 @@
+[
+  {"id": "recA", "fields": {"Business": "Bay Aesthetics Clinic", "Website": "https://www.bayclinic.sg/", "Dedupe Key": "bayclinic.sg", "Status": "Contacted", "Next Action Date": "2026-11-20", "Next Action": "Follow up after demo"}},
+  {"id": "recB", "fields": {"Business": "The Collar Club", "Dedupe Key": "thecollarclub", "Status": "Ready for review", "Signal Date": "2026-09-01"}},
+  {"id": "recC", "fields": {"Business": "Dentalis", "Dedupe Key": "dentalis", "Status": "Interested"}},
+  {"id": "recD", "fields": {"Business": "Stalford Learning Centre", "Website": "https://www.stalford.edu.sg/", "Dedupe Key": "stalford.edu.sg", "Status": "Ready for review", "Signal Deadline": "2026-10-31"}},
+  {"id": "recE", "fields": {"Business": "Nanyang Education (NY Education)", "Website": "https://nanyangeducation.com/", "Dedupe Key": "nanyangeducation.com", "Status": "Meeting booked"}}
+]

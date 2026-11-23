@@ -1,0 +1,132 @@
+{
+  "results": [
+    {
+      "uuid": "mcf-001",
+      "title": "Receptionist (WhatsApp & phone enquiries, appointment booking)",
+      "description": "<p>Handle phone, WhatsApp and email enquiries. Schedule appointments. Front desk duties in Singapore clinic.</p>",
+      "postedCompany": {
+        "name": "SUNRISE AESTHETICS PTE. LTD.",
+        "uen": "201900001A",
+        "companyUrl": "www.sunriseaesthetics.sg",
+        "ssicDescription2020": "BEAUTY AND WELLNESS SERVICES"
+      },
+      "hiringCompany": null,
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/receptionist-sunrise-aesthetics-mcf001",
+        "newPostingDate": "2026-11-19",
+        "expiryDate": "2026-12-19",
+        "isPostedOnBehalf": false
+      }
+    },
+    {
+      "uuid": "mcf-002",
+      "title": "Customer Service Executive",
+      "description": "On behalf of our client, a leading company. EA Licence No: 12C3456.",
+      "postedCompany": {
+        "name": "TALENT BRIDGE RECRUITMENT PTE LTD",
+        "uen": "201800002B",
+        "ssicCode2020": "78104",
+        "ssicDescription2020": "EMPLOYMENT AGENCIES"
+      },
+      "hiringCompany": null,
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/cs-exec-mcf002",
+        "newPostingDate": "2026-11-20",
+        "isPostedOnBehalf": true
+      }
+    },
+    {
+      "uuid": "mcf-003",
+      "title": "Admin Assistant",
+      "description": "General admin support.",
+      "postedCompany": {
+        "name": "OLD LISTING TUITION PTE LTD",
+        "uen": "201700003C"
+      },
+      "hiringCompany": null,
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/admin-mcf003",
+        "newPostingDate": "2026-10-01"
+      }
+    },
+    {
+      "uuid": "mcf-004",
+      "title": "Appointment Coordinator",
+      "description": "Coordinate appointments and customer calls.",
+      "postedCompany": {
+        "name": "STAFFING PARTNER PTE LTD",
+        "uen": "201600004D",
+        "ssicCode2020": "78104"
+      },
+      "hiringCompany": {
+        "name": "BAY AESTHETICS PTE. LTD.",
+        "uen": "201500005E",
+        "companyUrl": "https://www.bayclinic.sg"
+      },
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/appt-mcf004",
+        "newPostingDate": "2026-11-21",
+        "isPostedOnBehalf": true
+      }
+    },
+    {
+      "uuid": "mcf-005",
+      "title": "Financial Services Receptionist",
+      "description": "Phone and appointment handling at a financial advisory firm.",
+      "postedCompany": {
+        "name": "PRUDENT WEALTH FINANCIAL ADVISORY PTE LTD",
+        "uen": "201400006F"
+      },
+      "hiringCompany": null,
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/fa-mcf005",
+        "newPostingDate": "2026-11-20"
+      }
+    },
+    {
+      "uuid": "mcf-006",
+      "title": "Receptionist (second role, same employer)",
+      "description": "Answer enquiries on WhatsApp and phone; book appointments.",
+      "postedCompany": {
+        "name": "SUNRISE AESTHETICS PTE. LTD.",
+        "uen": "201900001A"
+      },
+      "hiringCompany": null,
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/receptionist2-sunrise-mcf006",
+        "newPostingDate": "2026-11-20"
+      }
+    },
+    {
+      "uuid": "mcf-007",
+      "title": "Receptionist (employer hidden)",
+      "description": "Phone enquiries and booking.",
+      "postedCompany": {
+        "name": "HIDDEN CO PTE LTD",
+        "uen": "201300007G"
+      },
+      "hiringCompany": null,
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/hidden-mcf007",
+        "newPostingDate": "2026-11-21",
+        "isHideEmployerName": true
+      }
+    },
+    {
+      "uuid": "mcf-008",
+      "title": "Front Desk Executive",
+      "description": "Reception, phone calls, appointment scheduling.",
+      "postedCompany": {
+        "name": "STAFF-LIKE ACADEMY PTE LTD",
+        "uen": "201200008H",
+        "ssicCode2020": "78104",
+        "ssicDescription2020": "EMPLOYMENT AGENCIES"
+      },
+      "hiringCompany": null,
+      "metadata": {
+        "jobDetailsUrl": "https://www.mycareersfuture.gov.sg/job/ssic-mcf008",
+        "newPostingDate": "2026-11-21"
+      }
+    }
+  ]
+}
