@@ -1,7 +1,7 @@
-out/video.mp4
+out/video*.mp4
 out/.video_segs-*
-out/render.log
+out/render*.log
 review/
 node_modules/
 out/*.wav
-out/readcheck.log
+out/readcheck*.log

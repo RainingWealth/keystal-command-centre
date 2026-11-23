@@ -27,6 +27,7 @@ function wrap(g, text, maxW) { const out = []; let cur = ''; for (const wd of te
 
 export function drawOverlay(g, t, TL, texts) {
   for (const S of TL.strips) {
+    if (S.only && S.only !== TL.look) continue;
     if (t < S.t0 || t > S.t1 + .4) continue;
     const p = ss(seg(t, S.t0, S.t0 + .75)), out = 1 - seg(t, S.t1 - .1, S.t1 + .35); if (out <= 0) continue;
     g.save(); g.globalAlpha = out; const seed = hashStr(S.id);
@@ -57,6 +58,12 @@ export function drawOverlay(g, t, TL, texts) {
           if (i < 2) { g2.strokeStyle = 'rgba(42,26,14,.25)'; g2.lineWidth = 1.5; g2.beginPath(); g2.moveTo(40, y + 28); g2.lineTo(w - 40, y + 28); g2.stroke(); } });
         g2.font = `italic 400 30px ${FONT}`; g2.fillStyle = INK; g2.globalAlpha = .7; g2.fillText(S.note, 40, h - 26); g2.globalAlpha = 1; }, seed);
       texts.push({ id: S.id, text: S.lines.map(r => r.join(' ')).join(' '), x0: x, y0: S.y, x1: x + w, y1: S.y + h - 60 }, { id: S.id + 'n', text: S.note, x0: x, y0: S.y + h - 60, x1: x + w, y1: S.y + h, pass: true });
+    }
+    if (S.kind === 'reg') {
+      const w = S.w, h = 250, x = 540 - w / 2, fade = 1 - .72 * ss(seg(t, S.t0 + .3, S.t0 + 1.5));
+      bar(g, x, S.y, w, h, p, 'left', (g2) => { g2.fillStyle = INK; g2.font = `700 66px ${FONT}`; g2.globalAlpha = fade; g2.fillText('DANIEL', 40, 90); g2.textAlign = 'right'; g2.fillText('50%', w - 40, 90); g2.textAlign = 'left'; g2.globalAlpha = 1;
+        g2.fillText('AARON', 40, 170); g2.textAlign = 'right'; g2.fillText('50%', w - 40, 170); g2.textAlign = 'left'; g2.globalAlpha = .55 + .2 * Math.sin(t * 3); g2.font = `italic 400 56px ${FONT}`; g2.fillText('?', 40, 232); g2.textAlign = 'right'; g2.fillText('?', w - 40, 232); g2.textAlign = 'left'; g2.globalAlpha = 1; }, seed);
+      texts.push({ id: S.id, text: 'DANIEL 50% AARON 50% ?', x0: x, y0: S.y, x1: x + w, y1: S.y + h });
     }
     if (S.kind === 'endq') {
       g.font = `600 ${S.size}px ${FONT}`; g.fillStyle = CREAM; g.textAlign = 'center'; g.shadowColor = 'rgba(255,190,100,.55)'; g.shadowBlur = 26;

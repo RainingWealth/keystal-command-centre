@@ -1,4 +1,6 @@
-# Project style: Paper-cut Lightbox, vertical, drama edition
+# Project style: vertical drama, two looks
+
+**Main film (photoreal):** generated stills with slow camera moves, light pulses and composited details, plus paper-text overlays and burned-in captions (`src/shots_photo.js`, page query `look=photo`). **Alternate cut (paper):** the Paper-cut Lightbox look described below (`src/shots_a/b/c.js`, `look=paper`). Both share one timeline, one soundtrack and the same overlays. The rest of this file describes the paper-cut look and the project's vertical adaptation, which both cuts use for type, captions and the end card.
 
 Base: the library style "Paper-cut Lightbox" (layered cut paper lit from behind). Everything in its STYLE.md that is about the look is kept: flat-colour sheets in a value ladder (back bright and translucent, front dark), fibre grain, a warm rim on top edges and a dark band on bottom edges, soft cast shadows, light bleeding through paper, emissive windows with bloom, text as cut paper, jointed silhouette figures, slow short camera moves, dissolves / light-off / iris transitions, paper-and-light foley, soft piano / strings / glockenspiel / harp score.
 

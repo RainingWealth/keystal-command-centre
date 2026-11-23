@@ -1,6 +1,6 @@
 # THE PARTNER WHO NEVER CAME BACK: treatment
 
-**Style:** Paper-cut Lightbox (Lemo-Opuscar library), vertical 1080×1920 at 30 fps, ≤ 120 s. **Voice:** Kokoro (offline), British male/female voices cast per character. **Picture:** a stack of backlit cut-paper sheets with jointed silhouette figures; no lip-sync, performance comes from posture, light, framing and sound.
+**Look:** written for the Paper-cut Lightbox style (Lemo-Opuscar library); the film was later also made as a photoreal cut with generated stills (see `style/STYLE.md`); both share this structure. Vertical 1080×1920 at 30 fps, ≤ 120 s. **Voice:** Kokoro (offline), British male/female voices cast per character. **Picture:** a stack of backlit cut-paper sheets with jointed silhouette figures; no lip-sync, performance comes from posture, light, framing and sound.
 
 ## 1. Three structures considered
 

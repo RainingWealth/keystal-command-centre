@@ -45,6 +45,11 @@ Lines marked **(added)** are not in the brief; they were added to meet a require
 | 0:56.70 | Accountant | To raise that amount, you may have to borrow heavily, sell assets, or bring in another investor. | bf_isabella |
 | 1:03.80 | Narrator | One family needed liquidity. One founder needed business continuity. Neither wanted a dispute. But there was no funded exit plan. | bm_george |
 
+**On-screen text (paper):**
+
+- 1:10.10: LOAN AGREEMENT
+- 1:12.35: DANIEL 50% / AARON 50% / ?
+
 ## S5 Rewind: what if they had prepared?  (1:14.00 to 1:19.40)
 
 | Time | Speaker | Line | Voice |
