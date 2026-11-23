@@ -16,6 +16,16 @@ test('canonical domain strips www/path and rejects job boards, social, gov', () 
   assert.equal(E.canonicalDomain('not a url'), null);
 });
 
+test('hostOf/normUrl are regex-based: userinfo, port, no scheme, uppercase, tracking params', () => {
+  assert.equal(E.hostOf('HTTPS://User:pw@WWW.Example.sg:8443/a/b?x=1#z'), 'example.sg');
+  assert.equal(E.hostOf('www.example.com.sg'), 'example.com.sg');
+  assert.equal(E.hostOf('example.sg:8080/x'), 'example.sg');
+  assert.equal(E.hostOf('not a url'), null);
+  assert.equal(E.hostOf('localhost'), null);
+  assert.equal(E.normUrl('https://www.Example.sg/Path/?utm_source=a&id=5#frag'), 'example.sg/path?id=5');
+  assert.equal(E.normUrl('http://example.sg/path'), E.normUrl('https://www.example.sg/path/'));
+});
+
 test('name normalisation: legal suffixes, "the", punctuation', () => {
   assert.equal(E.nameSlug('SUNRISE AESTHETICS PTE. LTD.'), 'sunriseaesthetics');
   assert.ok(E.nameSlugVariants('The Collar Club').includes('collarclub'));

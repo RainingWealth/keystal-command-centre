@@ -12,8 +12,9 @@ function runChain({ trigger = 'manual', dryRun = false, mcfResponse, webResponse
   const out = {};
   const exec = (name, file, input = [{ json: {} }]) => {
     const $ = (n) => ({ first: () => out[n][0], all: () => out[n] });
-    const fn = new Function('$', '$input', '$execution', dist(file));
-    const res = fn($, { first: () => input[0], all: () => input }, { id: 'sim-1' });
+    // URL / URLSearchParams are shadowed to undefined: n8n's Code sandbox does not provide them (verified live)
+    const fn = new Function('$', '$input', '$execution', 'URL', 'URLSearchParams', dist(file));
+    const res = fn($, { first: () => input[0], all: () => input }, { id: 'sim-1' }, undefined, undefined);
     out[name] = res;
     return res;
   };
@@ -129,4 +130,17 @@ test('write failure for one batch is reported (Partial), not swallowed', () => {
   const r = runChain({ mcfResponse: shifted, webResponse: { results: [] }, pageResponse: page, writeResponse: (it, i) => it.table === 'Prospects' ? { error: { message: 'The credential needs to be reconnected' } } : { records: it.body.records.map((x, k) => ({ id: 'rec' + i + k, fields: x.fields })) } });
   assert.equal(r.fin[0].json.summary.status, 'Partial');
   assert.match(r.fin[0].json.body.fields['Notes'], /reconnected/);
+});
+
+test('sandbox regression: with URL undefined (as in n8n), MCF websites/domains and web hosts still resolve', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const shifted = JSON.parse(JSON.stringify(mcfRes));
+  shifted.results.forEach((j) => { if (j.metadata.newPostingDate !== '2026-10-01') j.metadata.newPostingDate = today; if (j.metadata.expiryDate) j.metadata.expiryDate = '2099-01-01'; });
+  const r = runChain({ mcfResponse: shifted, webResponse: webRes, pageResponse: page });
+  const cands = r.out['Pool MCF'][0].json.mcfCandidates;
+  assert.ok(cands.some((c) => c.domain === 'sunriseaesthetics.sg' && c.website === 'https://sunriseaesthetics.sg/'));
+  const web = r.out['Pool Web'][0].json.webCandidates;
+  assert.ok(web.length >= 3, 'first-party web hosts must not all be treated as blocked');
+  assert.ok(web.some((c) => c.domain === 'greenleaf-learning.sg'));
+  assert.ok(r.out['Pool Web'][0].json.webStats.blockedSkipped >= 1);
 });

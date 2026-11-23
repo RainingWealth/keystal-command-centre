@@ -89,10 +89,12 @@ function stripHtml(html) {
 
 /* ---------- identity ---------- */
 function hostOf(url) {
+  // regex-based on purpose: n8n's Code sandbox has no URL / URLSearchParams globals
   if (!url || typeof url !== 'string') return null;
-  let u = url.trim();
-  if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
-  try { return new URL(u).hostname.toLowerCase().replace(/^www\d?\./, ''); } catch (e) { return null; }
+  const m = url.trim().match(/^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:[^\/?#@\s]*@)?([^\/?#:\s]+)(?::\d+)?(?:[\/?#]|$)/i);
+  if (!m) return null;
+  const host = m[1].toLowerCase().replace(/^www\d?\./, '');
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : null;
 }
 function isBlockedDomain(host) {
   if (!host) return true;
@@ -585,7 +587,13 @@ function prospectFields(c, scored, brief, ctx) {
   return f;
 }
 function normUrl(u) {
-  try { const x = new URL(String(u).trim()); const keep = []; x.searchParams.forEach((v, k) => { if (!/^(utm_|fbclid|gclid)/i.test(k)) keep.push(k + '=' + v); }); return x.hostname.toLowerCase().replace(/^www\./, '') + x.pathname.replace(/\/+$/, '').toLowerCase() + (keep.length ? '?' + keep.join('&') : ''); } catch (e) { return String(u || ''); }
+  const str = String(u || '').trim();
+  const m = str.match(/^(?:[a-z][a-z0-9+.-]*:\/\/)?(?:[^\/?#@\s]*@)?([^\/?#:\s]+)(?::\d+)?([^?#]*)(\?[^#]*)?/i);
+  if (!m) return str;
+  const host = m[1].toLowerCase().replace(/^www\./, '');
+  const path = (m[2] || '').replace(/\/+$/, '').toLowerCase();
+  const q = (m[3] || '').slice(1).split('&').filter((x) => x && !/^(utm_|fbclid|gclid)/i.test(x)).join('&');
+  return host + path + (q ? '?' + q : '');
 }
 function rawSignalKey(c) { return 'sig:' + hash(c.evidenceUrl ? normUrl(c.evidenceUrl) : (c.business + c.evidenceText)); }
 function rawFields(c, status, ctx, extra) {
