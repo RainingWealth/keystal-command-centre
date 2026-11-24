@@ -1,0 +1,37 @@
+{
+ "id": "s2a",
+ "text": "Annual revenue? One point two million.",
+ "duration": 3.699,
+ "words": [
+  {
+   "text": "Annual",
+   "start": 0.0,
+   "end": 0.372
+  },
+  {
+   "text": "revenue",
+   "start": 0.385,
+   "end": 1.084
+  },
+  {
+   "text": "One",
+   "start": 2.015,
+   "end": 2.392
+  },
+  {
+   "text": "point",
+   "start": 2.405,
+   "end": 2.755
+  },
+  {
+   "text": "two",
+   "start": 2.768,
+   "end": 2.956
+  },
+  {
+   "text": "million",
+   "start": 2.97,
+   "end": 3.655
+  }
+ ]
+}

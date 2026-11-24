@@ -1,0 +1,1319 @@
+{
+ "fps": 30,
+ "totalFrames": 2533,
+ "totalSeconds": 84.433,
+ "scenes": [
+  {
+   "id": "S1",
+   "start": 0,
+   "end": 211,
+   "segments": [
+    {
+     "id": "s1a",
+     "text": "This company makes over one million dollars a year.",
+     "start": 18,
+     "dur": 95,
+     "durSec": 3.172,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "This",
+       "display": "This",
+       "start": 0.6,
+       "end": 0.866,
+       "frame": 18,
+       "tone": "none"
+      },
+      {
+       "spoken": "company",
+       "display": "company",
+       "start": 0.879,
+       "end": 1.343,
+       "frame": 26,
+       "tone": "none"
+      },
+      {
+       "spoken": "makes",
+       "display": "makes",
+       "start": 1.355,
+       "end": 1.703,
+       "frame": 41,
+       "tone": "none"
+      },
+      {
+       "spoken": "over",
+       "display": "over",
+       "start": 1.716,
+       "end": 2.0,
+       "frame": 51,
+       "tone": "none"
+      },
+      {
+       "spoken": "one",
+       "display": "one",
+       "start": 2.013,
+       "end": 2.27,
+       "frame": 60,
+       "tone": "none"
+      },
+      {
+       "spoken": "million",
+       "display": "million",
+       "start": 2.283,
+       "end": 2.618,
+       "frame": 68,
+       "tone": "none"
+      },
+      {
+       "spoken": "dollars",
+       "display": "dollars",
+       "start": 2.631,
+       "end": 3.082,
+       "frame": 79,
+       "tone": "none"
+      },
+      {
+       "spoken": "a",
+       "display": "a",
+       "start": 3.095,
+       "end": 3.147,
+       "frame": 93,
+       "tone": "none"
+      },
+      {
+       "spoken": "year",
+       "display": "year.",
+       "start": 3.16,
+       "end": 3.688,
+       "frame": 95,
+       "tone": "none"
+      }
+     ]
+    },
+    {
+     "id": "s1b",
+     "text": "On paper, business is good.",
+     "start": 128,
+     "dur": 74,
+     "durSec": 2.457,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "On",
+       "display": "On",
+       "start": 4.267,
+       "end": 4.448,
+       "frame": 128,
+       "tone": "none"
+      },
+      {
+       "spoken": "paper",
+       "display": "paper,",
+       "start": 4.461,
+       "end": 5.144,
+       "frame": 134,
+       "tone": "none"
+      },
+      {
+       "spoken": "business",
+       "display": "business",
+       "start": 5.363,
+       "end": 5.918,
+       "frame": 161,
+       "tone": "none"
+      },
+      {
+       "spoken": "is",
+       "display": "is",
+       "start": 5.93,
+       "end": 6.149,
+       "frame": 178,
+       "tone": "none"
+      },
+      {
+       "spoken": "good",
+       "display": "good.",
+       "start": 6.162,
+       "end": 6.639,
+       "frame": 185,
+       "tone": "none"
+      }
+     ]
+    }
+   ],
+   "dur": 211
+  },
+  {
+   "id": "S2",
+   "start": 211,
+   "end": 503,
+   "segments": [
+    {
+     "id": "s2a",
+     "text": "Annual revenue? One point two million.",
+     "start": 217,
+     "dur": 111,
+     "durSec": 3.699,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Annual",
+       "display": "Annual",
+       "start": 7.233,
+       "end": 7.605,
+       "frame": 217,
+       "tone": "none"
+      },
+      {
+       "spoken": "revenue",
+       "display": "revenue?",
+       "start": 7.618,
+       "end": 8.317,
+       "frame": 229,
+       "tone": "none"
+      },
+      {
+       "spoken": "One point two million",
+       "display": "S$1.2 million.",
+       "start": 9.248,
+       "end": 10.888,
+       "frame": 277,
+       "tone": "amount"
+      }
+     ]
+    },
+    {
+     "id": "s2b",
+     "text": "Reported profit? One hundred and eighty thousand.",
+     "start": 341,
+     "dur": 131,
+     "durSec": 4.381,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Reported",
+       "display": "Reported",
+       "start": 11.367,
+       "end": 12.028,
+       "frame": 341,
+       "tone": "none"
+      },
+      {
+       "spoken": "profit",
+       "display": "profit?",
+       "start": 12.041,
+       "end": 12.713,
+       "frame": 361,
+       "tone": "none"
+      },
+      {
+       "spoken": "One hundred and eighty thousand",
+       "display": "S$180,000.",
+       "start": 13.644,
+       "end": 15.768,
+       "frame": 409,
+       "tone": "amount"
+      }
+     ]
+    }
+   ],
+   "dur": 292
+  },
+  {
+   "id": "S3",
+   "start": 503,
+   "end": 896,
+   "segments": [
+    {
+     "id": "s3a",
+     "text": "But tonight, the founder checks the bank account.",
+     "start": 518,
+     "dur": 93,
+     "durSec": 3.11,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "But",
+       "display": "But",
+       "start": 17.267,
+       "end": 17.468,
+       "frame": 518,
+       "tone": "none"
+      },
+      {
+       "spoken": "tonight",
+       "display": "tonight,",
+       "start": 17.481,
+       "end": 18.034,
+       "frame": 524,
+       "tone": "none"
+      },
+      {
+       "spoken": "the",
+       "display": "the",
+       "start": 18.284,
+       "end": 18.442,
+       "frame": 549,
+       "tone": "none"
+      },
+      {
+       "spoken": "founder",
+       "display": "founder",
+       "start": 18.455,
+       "end": 18.81,
+       "frame": 554,
+       "tone": "none"
+      },
+      {
+       "spoken": "checks",
+       "display": "checks",
+       "start": 18.823,
+       "end": 19.165,
+       "frame": 565,
+       "tone": "none"
+      },
+      {
+       "spoken": "the",
+       "display": "the",
+       "start": 19.178,
+       "end": 19.31,
+       "frame": 575,
+       "tone": "none"
+      },
+      {
+       "spoken": "bank",
+       "display": "bank",
+       "start": 19.323,
+       "end": 19.613,
+       "frame": 580,
+       "tone": "none"
+      },
+      {
+       "spoken": "account",
+       "display": "account.",
+       "start": 19.626,
+       "end": 20.257,
+       "frame": 589,
+       "tone": "none"
+      }
+     ]
+    },
+    {
+     "id": "s3b",
+     "text": "Fourteen thousand dollars.",
+     "start": 638,
+     "dur": 62,
+     "durSec": 2.067,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Fourteen thousand dollars",
+       "display": "S$14,000.",
+       "start": 21.267,
+       "end": 23.287,
+       "frame": 638,
+       "tone": "amount"
+      }
+     ]
+    },
+    {
+     "id": "s3c",
+     "text": "Tomorrow's payroll? Thirty-six thousand.",
+     "start": 717,
+     "dur": 114,
+     "durSec": 3.787,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Tomorrow's",
+       "display": "Tomorrow's",
+       "start": 23.9,
+       "end": 24.436,
+       "frame": 717,
+       "tone": "none"
+      },
+      {
+       "spoken": "payroll",
+       "display": "payroll?",
+       "start": 24.449,
+       "end": 25.148,
+       "frame": 733,
+       "tone": "red"
+      },
+      {
+       "spoken": "Thirty-six thousand",
+       "display": "S$36,000.",
+       "start": 26.093,
+       "end": 27.638,
+       "frame": 783,
+       "tone": "amount"
+      }
+     ]
+    }
+   ],
+   "dur": 393
+  },
+  {
+   "id": "S4",
+   "start": 896,
+   "end": 1195,
+   "segments": [
+    {
+     "id": "s4a",
+     "text": "What happened?",
+     "start": 902,
+     "dur": 27,
+     "durSec": 0.889,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "What",
+       "display": "What",
+       "start": 30.067,
+       "end": 30.258,
+       "frame": 902,
+       "tone": "none"
+      },
+      {
+       "spoken": "happened",
+       "display": "happened?",
+       "start": 30.271,
+       "end": 30.941,
+       "frame": 908,
+       "tone": "none"
+      }
+     ]
+    },
+    {
+     "id": "s4b",
+     "text": "Customers pay ninety days after invoicing.",
+     "start": 942,
+     "dur": 88,
+     "durSec": 2.928,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Customers",
+       "display": "Customers",
+       "start": 31.4,
+       "end": 31.965,
+       "frame": 942,
+       "tone": "none"
+      },
+      {
+       "spoken": "pay",
+       "display": "pay",
+       "start": 31.978,
+       "end": 32.184,
+       "frame": 959,
+       "tone": "none"
+      },
+      {
+       "spoken": "ninety days",
+       "display": "90 days",
+       "start": 32.197,
+       "end": 33.087,
+       "frame": 966,
+       "tone": "none"
+      },
+      {
+       "spoken": "after",
+       "display": "after",
+       "start": 33.099,
+       "end": 33.447,
+       "frame": 993,
+       "tone": "none"
+      },
+      {
+       "spoken": "invoicing",
+       "display": "invoicing.",
+       "start": 33.46,
+       "end": 34.324,
+       "frame": 1004,
+       "tone": "amber"
+      }
+     ]
+    },
+    {
+     "id": "s4c",
+     "text": "Suppliers want payment now. And salaries don't wait.",
+     "start": 1045,
+     "dur": 129,
+     "durSec": 4.304,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Suppliers",
+       "display": "Suppliers",
+       "start": 34.833,
+       "end": 35.402,
+       "frame": 1045,
+       "tone": "none"
+      },
+      {
+       "spoken": "want",
+       "display": "want",
+       "start": 35.415,
+       "end": 35.673,
+       "frame": 1062,
+       "tone": "none"
+      },
+      {
+       "spoken": "payment",
+       "display": "payment",
+       "start": 35.686,
+       "end": 36.047,
+       "frame": 1071,
+       "tone": "none"
+      },
+      {
+       "spoken": "now",
+       "display": "now.",
+       "start": 36.06,
+       "end": 36.446,
+       "frame": 1082,
+       "tone": "red"
+      },
+      {
+       "spoken": "And",
+       "display": "And",
+       "start": 37.337,
+       "end": 37.556,
+       "frame": 1120,
+       "tone": "none"
+      },
+      {
+       "spoken": "salaries",
+       "display": "salaries",
+       "start": 37.569,
+       "end": 38.162,
+       "frame": 1127,
+       "tone": "red"
+      },
+      {
+       "spoken": "don't",
+       "display": "don't",
+       "start": 38.174,
+       "end": 38.458,
+       "frame": 1145,
+       "tone": "none"
+      },
+      {
+       "spoken": "wait",
+       "display": "wait.",
+       "start": 38.471,
+       "end": 39.064,
+       "frame": 1154,
+       "tone": "none"
+      }
+     ]
+    }
+   ],
+   "dur": 299
+  },
+  {
+   "id": "S5",
+   "start": 1195,
+   "end": 1402,
+   "segments": [
+    {
+     "id": "s5a",
+     "text": "Every new order looks like growth.",
+     "start": 1201,
+     "dur": 59,
+     "durSec": 1.966,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Every",
+       "display": "Every",
+       "start": 40.033,
+       "end": 40.248,
+       "frame": 1201,
+       "tone": "none"
+      },
+      {
+       "spoken": "new",
+       "display": "new",
+       "start": 40.261,
+       "end": 40.57,
+       "frame": 1208,
+       "tone": "none"
+      },
+      {
+       "spoken": "order",
+       "display": "order",
+       "start": 40.583,
+       "end": 40.866,
+       "frame": 1217,
+       "tone": "none"
+      },
+      {
+       "spoken": "looks",
+       "display": "looks",
+       "start": 40.879,
+       "end": 41.176,
+       "frame": 1226,
+       "tone": "none"
+      },
+      {
+       "spoken": "like",
+       "display": "like",
+       "start": 41.189,
+       "end": 41.421,
+       "frame": 1236,
+       "tone": "none"
+      },
+      {
+       "spoken": "growth",
+       "display": "growth.",
+       "start": 41.433,
+       "end": 41.884,
+       "frame": 1243,
+       "tone": "none"
+      }
+     ]
+    },
+    {
+     "id": "s5b",
+     "text": "But every order also needs cash before the customer pays.",
+     "start": 1274,
+     "dur": 110,
+     "durSec": 3.674,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "But",
+       "display": "But",
+       "start": 42.467,
+       "end": 42.664,
+       "frame": 1274,
+       "tone": "none"
+      },
+      {
+       "spoken": "every",
+       "display": "every",
+       "start": 42.677,
+       "end": 42.973,
+       "frame": 1280,
+       "tone": "none"
+      },
+      {
+       "spoken": "order",
+       "display": "order",
+       "start": 42.986,
+       "end": 43.27,
+       "frame": 1290,
+       "tone": "none"
+      },
+      {
+       "spoken": "also",
+       "display": "also",
+       "start": 43.283,
+       "end": 43.579,
+       "frame": 1298,
+       "tone": "none"
+      },
+      {
+       "spoken": "needs",
+       "display": "needs",
+       "start": 43.592,
+       "end": 43.94,
+       "frame": 1308,
+       "tone": "none"
+      },
+      {
+       "spoken": "cash",
+       "display": "cash",
+       "start": 43.953,
+       "end": 44.288,
+       "frame": 1319,
+       "tone": "cyan"
+      },
+      {
+       "spoken": "before",
+       "display": "before",
+       "start": 44.301,
+       "end": 44.661,
+       "frame": 1329,
+       "tone": "none"
+      },
+      {
+       "spoken": "the",
+       "display": "the",
+       "start": 44.674,
+       "end": 44.777,
+       "frame": 1340,
+       "tone": "none"
+      },
+      {
+       "spoken": "customer",
+       "display": "customer",
+       "start": 44.79,
+       "end": 45.344,
+       "frame": 1344,
+       "tone": "none"
+      },
+      {
+       "spoken": "pays",
+       "display": "pays.",
+       "start": 45.357,
+       "end": 46.04,
+       "frame": 1361,
+       "tone": "none"
+      }
+     ]
+    }
+   ],
+   "dur": 207
+  },
+  {
+   "id": "S6",
+   "start": 1402,
+   "end": 1694,
+   "segments": [
+    {
+     "id": "s6a",
+     "text": "The company isn't necessarily losing money.",
+     "start": 1408,
+     "dur": 82,
+     "durSec": 2.735,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "The",
+       "display": "The",
+       "start": 46.933,
+       "end": 47.011,
+       "frame": 1408,
+       "tone": "none"
+      },
+      {
+       "spoken": "company",
+       "display": "company",
+       "start": 47.024,
+       "end": 47.514,
+       "frame": 1411,
+       "tone": "none"
+      },
+      {
+       "spoken": "isn't",
+       "display": "isn't",
+       "start": 47.527,
+       "end": 47.9,
+       "frame": 1426,
+       "tone": "none"
+      },
+      {
+       "spoken": "necessarily",
+       "display": "necessarily",
+       "start": 47.913,
+       "end": 48.622,
+       "frame": 1437,
+       "tone": "none"
+      },
+      {
+       "spoken": "losing",
+       "display": "losing",
+       "start": 48.635,
+       "end": 49.034,
+       "frame": 1459,
+       "tone": "none"
+      },
+      {
+       "spoken": "money",
+       "display": "money.",
+       "start": 49.047,
+       "end": 49.601,
+       "frame": 1471,
+       "tone": "none"
+      }
+     ]
+    },
+    {
+     "id": "s6b",
+     "text": "Its cash is trapped in unpaid invoices, while real bills keep arriving.",
+     "start": 1505,
+     "dur": 140,
+     "durSec": 4.683,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Its",
+       "display": "Its",
+       "start": 50.167,
+       "end": 50.356,
+       "frame": 1505,
+       "tone": "none"
+      },
+      {
+       "spoken": "cash",
+       "display": "cash",
+       "start": 50.369,
+       "end": 50.704,
+       "frame": 1511,
+       "tone": "cyan"
+      },
+      {
+       "spoken": "is",
+       "display": "is",
+       "start": 50.717,
+       "end": 50.859,
+       "frame": 1522,
+       "tone": "none"
+      },
+      {
+       "spoken": "trapped",
+       "display": "trapped",
+       "start": 50.872,
+       "end": 51.22,
+       "frame": 1526,
+       "tone": "none"
+      },
+      {
+       "spoken": "in",
+       "display": "in",
+       "start": 51.233,
+       "end": 51.387,
+       "frame": 1537,
+       "tone": "none"
+      },
+      {
+       "spoken": "unpaid",
+       "display": "unpaid",
+       "start": 51.4,
+       "end": 51.838,
+       "frame": 1542,
+       "tone": "amber"
+      },
+      {
+       "spoken": "invoices",
+       "display": "invoices,",
+       "start": 51.851,
+       "end": 52.689,
+       "frame": 1556,
+       "tone": "amber"
+      },
+      {
+       "spoken": "while",
+       "display": "while",
+       "start": 52.934,
+       "end": 53.217,
+       "frame": 1588,
+       "tone": "none"
+      },
+      {
+       "spoken": "real",
+       "display": "real",
+       "start": 53.23,
+       "end": 53.527,
+       "frame": 1597,
+       "tone": "none"
+      },
+      {
+       "spoken": "bills",
+       "display": "bills",
+       "start": 53.539,
+       "end": 53.849,
+       "frame": 1606,
+       "tone": "red"
+      },
+      {
+       "spoken": "keep",
+       "display": "keep",
+       "start": 53.862,
+       "end": 54.106,
+       "frame": 1616,
+       "tone": "none"
+      },
+      {
+       "spoken": "arriving",
+       "display": "arriving.",
+       "start": 54.119,
+       "end": 54.802,
+       "frame": 1624,
+       "tone": "none"
+      }
+     ]
+    }
+   ],
+   "dur": 292
+  },
+  {
+   "id": "S7",
+   "start": 1694,
+   "end": 2018,
+   "segments": [
+    {
+     "id": "s7a",
+     "text": "The solution starts with forecasting cash weekly, collecting receivables earlier, negotiating better payment terms, and maintaining a cash buffer.",
+     "start": 1703,
+     "dur": 286,
+     "durSec": 9.525,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "The",
+       "display": "The",
+       "start": 56.767,
+       "end": 56.837,
+       "frame": 1703,
+       "tone": "none"
+      },
+      {
+       "spoken": "solution",
+       "display": "solution",
+       "start": 56.85,
+       "end": 57.378,
+       "frame": 1706,
+       "tone": "none"
+      },
+      {
+       "spoken": "starts",
+       "display": "starts",
+       "start": 57.391,
+       "end": 57.726,
+       "frame": 1722,
+       "tone": "none"
+      },
+      {
+       "spoken": "with",
+       "display": "with",
+       "start": 57.739,
+       "end": 57.932,
+       "frame": 1732,
+       "tone": "none"
+      },
+      {
+       "spoken": "forecasting",
+       "display": "forecasting",
+       "start": 57.945,
+       "end": 58.628,
+       "frame": 1738,
+       "tone": "none"
+      },
+      {
+       "spoken": "cash",
+       "display": "cash",
+       "start": 58.641,
+       "end": 58.989,
+       "frame": 1759,
+       "tone": "cyan"
+      },
+      {
+       "spoken": "weekly",
+       "display": "weekly,",
+       "start": 59.002,
+       "end": 59.62,
+       "frame": 1770,
+       "tone": "none"
+      },
+      {
+       "spoken": "collecting",
+       "display": "collecting",
+       "start": 59.852,
+       "end": 60.432,
+       "frame": 1796,
+       "tone": "none"
+      },
+      {
+       "spoken": "receivables",
+       "display": "receivables",
+       "start": 60.445,
+       "end": 61.205,
+       "frame": 1813,
+       "tone": "amber"
+      },
+      {
+       "spoken": "earlier",
+       "display": "earlier,",
+       "start": 61.218,
+       "end": 61.734,
+       "frame": 1837,
+       "tone": "none"
+      },
+      {
+       "spoken": "negotiating",
+       "display": "negotiating",
+       "start": 61.991,
+       "end": 62.842,
+       "frame": 1860,
+       "tone": "none"
+      },
+      {
+       "spoken": "better",
+       "display": "better",
+       "start": 62.855,
+       "end": 63.216,
+       "frame": 1886,
+       "tone": "none"
+      },
+      {
+       "spoken": "payment",
+       "display": "payment",
+       "start": 63.229,
+       "end": 63.615,
+       "frame": 1897,
+       "tone": "none"
+      },
+      {
+       "spoken": "terms",
+       "display": "terms,",
+       "start": 63.628,
+       "end": 64.131,
+       "frame": 1909,
+       "tone": "none"
+      },
+      {
+       "spoken": "and",
+       "display": "and",
+       "start": 64.388,
+       "end": 64.569,
+       "frame": 1932,
+       "tone": "none"
+      },
+      {
+       "spoken": "maintaining",
+       "display": "maintaining",
+       "start": 64.582,
+       "end": 65.162,
+       "frame": 1937,
+       "tone": "none"
+      },
+      {
+       "spoken": "a",
+       "display": "a",
+       "start": 65.174,
+       "end": 65.265,
+       "frame": 1955,
+       "tone": "none"
+      },
+      {
+       "spoken": "cash",
+       "display": "cash",
+       "start": 65.277,
+       "end": 65.625,
+       "frame": 1958,
+       "tone": "cyan"
+      },
+      {
+       "spoken": "buffer",
+       "display": "buffer.",
+       "start": 65.638,
+       "end": 66.218,
+       "frame": 1969,
+       "tone": "none"
+      }
+     ]
+    }
+   ],
+   "dur": 324
+  },
+  {
+   "id": "S8",
+   "start": 2018,
+   "end": 2533,
+   "segments": [
+    {
+     "id": "s8a",
+     "text": "Because revenue makes headlines.",
+     "start": 2030,
+     "dur": 69,
+     "durSec": 2.3,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Because",
+       "display": "Because",
+       "start": 67.667,
+       "end": 68.069,
+       "frame": 2030,
+       "tone": "none"
+      },
+      {
+       "spoken": "revenue",
+       "display": "revenue",
+       "start": 68.082,
+       "end": 68.533,
+       "frame": 2042,
+       "tone": "none"
+      },
+      {
+       "spoken": "makes",
+       "display": "makes",
+       "start": 68.546,
+       "end": 68.919,
+       "frame": 2056,
+       "tone": "none"
+      },
+      {
+       "spoken": "headlines",
+       "display": "headlines.",
+       "start": 68.932,
+       "end": 69.886,
+       "frame": 2068,
+       "tone": "none"
+      }
+     ]
+    },
+    {
+     "id": "s8b",
+     "text": "Profit looks good on paper.",
+     "start": 2108,
+     "dur": 56,
+     "durSec": 1.875,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "Profit",
+       "display": "Profit",
+       "start": 70.267,
+       "end": 70.654,
+       "frame": 2108,
+       "tone": "none"
+      },
+      {
+       "spoken": "looks",
+       "display": "looks",
+       "start": 70.667,
+       "end": 70.963,
+       "frame": 2120,
+       "tone": "none"
+      },
+      {
+       "spoken": "good",
+       "display": "good",
+       "start": 70.976,
+       "end": 71.234,
+       "frame": 2129,
+       "tone": "none"
+      },
+      {
+       "spoken": "on",
+       "display": "on",
+       "start": 71.247,
+       "end": 71.44,
+       "frame": 2137,
+       "tone": "none"
+      },
+      {
+       "spoken": "paper",
+       "display": "paper.",
+       "start": 71.453,
+       "end": 72.072,
+       "frame": 2144,
+       "tone": "none"
+      }
+     ]
+    },
+    {
+     "id": "s8c",
+     "text": "But cash pays salaries.",
+     "start": 2174,
+     "dur": 63,
+     "durSec": 2.113,
+     "caption": true,
+     "words": [
+      {
+       "spoken": "But",
+       "display": "But",
+       "start": 72.467,
+       "end": 72.69,
+       "frame": 2174,
+       "tone": "none"
+      },
+      {
+       "spoken": "cash",
+       "display": "cash",
+       "start": 72.703,
+       "end": 73.141,
+       "frame": 2181,
+       "tone": "cyan"
+      },
+      {
+       "spoken": "pays",
+       "display": "pays",
+       "start": 73.154,
+       "end": 73.541,
+       "frame": 2195,
+       "tone": "none"
+      },
+      {
+       "spoken": "salaries",
+       "display": "salaries.",
+       "start": 73.554,
+       "end": 74.494,
+       "frame": 2207,
+       "tone": "red"
+      }
+     ]
+    },
+    {
+     "id": "s8d",
+     "text": "A profitable business can still run out of cash.",
+     "start": 2261,
+     "dur": 97,
+     "durSec": 3.224,
+     "caption": false,
+     "words": [
+      {
+       "spoken": "A",
+       "display": "A",
+       "start": 75.367,
+       "end": 75.46,
+       "frame": 2261,
+       "tone": "none"
+      },
+      {
+       "spoken": "profitable",
+       "display": "profitable",
+       "start": 75.473,
+       "end": 76.118,
+       "frame": 2264,
+       "tone": "none"
+      },
+      {
+       "spoken": "business",
+       "display": "business",
+       "start": 76.13,
+       "end": 76.62,
+       "frame": 2284,
+       "tone": "none"
+      },
+      {
+       "spoken": "can",
+       "display": "can",
+       "start": 76.633,
+       "end": 76.813,
+       "frame": 2299,
+       "tone": "none"
+      },
+      {
+       "spoken": "still",
+       "display": "still",
+       "start": 76.826,
+       "end": 77.187,
+       "frame": 2305,
+       "tone": "none"
+      },
+      {
+       "spoken": "run",
+       "display": "run",
+       "start": 77.2,
+       "end": 77.458,
+       "frame": 2316,
+       "tone": "none"
+      },
+      {
+       "spoken": "out",
+       "display": "out",
+       "start": 77.471,
+       "end": 77.651,
+       "frame": 2324,
+       "tone": "none"
+      },
+      {
+       "spoken": "of",
+       "display": "of",
+       "start": 77.664,
+       "end": 77.819,
+       "frame": 2330,
+       "tone": "none"
+      },
+      {
+       "spoken": "cash",
+       "display": "cash.",
+       "start": 77.831,
+       "end": 78.463,
+       "frame": 2335,
+       "tone": "cyan"
+      }
+     ]
+    },
+    {
+     "id": "s8e",
+     "text": "Is your business ready for a ninety-day payment delay?",
+     "start": 2382,
+     "dur": 92,
+     "durSec": 3.05,
+     "caption": false,
+     "words": [
+      {
+       "spoken": "Is",
+       "display": "Is",
+       "start": 79.4,
+       "end": 79.543,
+       "frame": 2382,
+       "tone": "none"
+      },
+      {
+       "spoken": "your",
+       "display": "your",
+       "start": 79.556,
+       "end": 79.685,
+       "frame": 2387,
+       "tone": "none"
+      },
+      {
+       "spoken": "business",
+       "display": "business",
+       "start": 79.698,
+       "end": 80.174,
+       "frame": 2391,
+       "tone": "none"
+      },
+      {
+       "spoken": "ready",
+       "display": "ready",
+       "start": 80.187,
+       "end": 80.51,
+       "frame": 2406,
+       "tone": "none"
+      },
+      {
+       "spoken": "for",
+       "display": "for",
+       "start": 80.522,
+       "end": 80.703,
+       "frame": 2416,
+       "tone": "none"
+      },
+      {
+       "spoken": "a",
+       "display": "a",
+       "start": 80.716,
+       "end": 80.742,
+       "frame": 2421,
+       "tone": "none"
+      },
+      {
+       "spoken": "ninety-day",
+       "display": "90-day",
+       "start": 80.754,
+       "end": 81.399,
+       "frame": 2423,
+       "tone": "amber"
+      },
+      {
+       "spoken": "payment",
+       "display": "payment",
+       "start": 81.412,
+       "end": 81.785,
+       "frame": 2442,
+       "tone": "none"
+      },
+      {
+       "spoken": "delay",
+       "display": "delay?",
+       "start": 81.798,
+       "end": 82.365,
+       "frame": 2454,
+       "tone": "none"
+      }
+     ]
+    }
+   ],
+   "dur": 515
+  }
+ ]
+}

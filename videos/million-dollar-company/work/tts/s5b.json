@@ -1,0 +1,57 @@
+{
+ "id": "s5b",
+ "text": "But every order also needs cash before the customer pays.",
+ "duration": 3.674,
+ "words": [
+  {
+   "text": "But",
+   "start": 0.0,
+   "end": 0.197
+  },
+  {
+   "text": "every",
+   "start": 0.21,
+   "end": 0.506
+  },
+  {
+   "text": "order",
+   "start": 0.519,
+   "end": 0.803
+  },
+  {
+   "text": "also",
+   "start": 0.816,
+   "end": 1.112
+  },
+  {
+   "text": "needs",
+   "start": 1.125,
+   "end": 1.473
+  },
+  {
+   "text": "cash",
+   "start": 1.486,
+   "end": 1.821
+  },
+  {
+   "text": "before",
+   "start": 1.834,
+   "end": 2.194
+  },
+  {
+   "text": "the",
+   "start": 2.207,
+   "end": 2.31
+  },
+  {
+   "text": "customer",
+   "start": 2.323,
+   "end": 2.877
+  },
+  {
+   "text": "pays",
+   "start": 2.89,
+   "end": 3.573
+  }
+ ]
+}

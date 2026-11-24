@@ -1,0 +1,27 @@
+{
+ "id": "s8a",
+ "text": "Because revenue makes headlines.",
+ "duration": 2.3,
+ "words": [
+  {
+   "text": "Because",
+   "start": 0.0,
+   "end": 0.402
+  },
+  {
+   "text": "revenue",
+   "start": 0.415,
+   "end": 0.866
+  },
+  {
+   "text": "makes",
+   "start": 0.879,
+   "end": 1.252
+  },
+  {
+   "text": "headlines",
+   "start": 1.265,
+   "end": 2.219
+  }
+ ]
+}

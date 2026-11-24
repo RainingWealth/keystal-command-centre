@@ -1,0 +1,27 @@
+{
+ "id": "s3c",
+ "text": "Tomorrow's payroll? Thirty-six thousand.",
+ "duration": 3.787,
+ "words": [
+  {
+   "text": "Tomorrow's",
+   "start": 0.0,
+   "end": 0.536
+  },
+  {
+   "text": "payroll",
+   "start": 0.549,
+   "end": 1.248
+  },
+  {
+   "text": "Thirty-six",
+   "start": 2.193,
+   "end": 2.945
+  },
+  {
+   "text": "thousand",
+   "start": 2.959,
+   "end": 3.738
+  }
+ ]
+}

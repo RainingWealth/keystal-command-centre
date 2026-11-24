@@ -1,0 +1,37 @@
+{
+ "id": "s6a",
+ "text": "The company isn't necessarily losing money.",
+ "duration": 2.735,
+ "words": [
+  {
+   "text": "The",
+   "start": 0.0,
+   "end": 0.078
+  },
+  {
+   "text": "company",
+   "start": 0.091,
+   "end": 0.581
+  },
+  {
+   "text": "isn't",
+   "start": 0.594,
+   "end": 0.967
+  },
+  {
+   "text": "necessarily",
+   "start": 0.98,
+   "end": 1.689
+  },
+  {
+   "text": "losing",
+   "start": 1.702,
+   "end": 2.101
+  },
+  {
+   "text": "money",
+   "start": 2.114,
+   "end": 2.668
+  }
+ ]
+}

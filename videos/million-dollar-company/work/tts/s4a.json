@@ -1,0 +1,17 @@
+{
+ "id": "s4a",
+ "text": "What happened?",
+ "duration": 0.889,
+ "words": [
+  {
+   "text": "What",
+   "start": 0.0,
+   "end": 0.191
+  },
+  {
+   "text": "happened",
+   "start": 0.204,
+   "end": 0.874
+  }
+ ]
+}

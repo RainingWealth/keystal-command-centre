@@ -1,0 +1,27 @@
+{
+ "id": "s8c",
+ "text": "But cash pays salaries.",
+ "duration": 2.113,
+ "words": [
+  {
+   "text": "But",
+   "start": 0.0,
+   "end": 0.223
+  },
+  {
+   "text": "cash",
+   "start": 0.236,
+   "end": 0.674
+  },
+  {
+   "text": "pays",
+   "start": 0.687,
+   "end": 1.074
+  },
+  {
+   "text": "salaries",
+   "start": 1.087,
+   "end": 2.027
+  }
+ ]
+}

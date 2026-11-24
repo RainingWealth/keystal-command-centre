@@ -1,0 +1,37 @@
+{
+ "id": "s5a",
+ "text": "Every new order looks like growth.",
+ "duration": 1.966,
+ "words": [
+  {
+   "text": "Every",
+   "start": 0.0,
+   "end": 0.215
+  },
+  {
+   "text": "new",
+   "start": 0.228,
+   "end": 0.537
+  },
+  {
+   "text": "order",
+   "start": 0.55,
+   "end": 0.833
+  },
+  {
+   "text": "looks",
+   "start": 0.846,
+   "end": 1.143
+  },
+  {
+   "text": "like",
+   "start": 1.156,
+   "end": 1.388
+  },
+  {
+   "text": "growth",
+   "start": 1.4,
+   "end": 1.851
+  }
+ ]
+}

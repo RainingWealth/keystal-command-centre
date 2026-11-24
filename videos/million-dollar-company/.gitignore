@@ -1,0 +1,7 @@
+node_modules/
+work/*
+!work/tts/
+work/tts/*
+!work/tts/*.json
+.remotion/
+*.log

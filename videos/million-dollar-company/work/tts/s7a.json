@@ -1,0 +1,102 @@
+{
+ "id": "s7a",
+ "text": "The solution starts with forecasting cash weekly, collecting receivables earlier, negotiating better payment terms, and maintaining a cash buffer.",
+ "duration": 9.525,
+ "words": [
+  {
+   "text": "The",
+   "start": 0.0,
+   "end": 0.07
+  },
+  {
+   "text": "solution",
+   "start": 0.083,
+   "end": 0.611
+  },
+  {
+   "text": "starts",
+   "start": 0.624,
+   "end": 0.959
+  },
+  {
+   "text": "with",
+   "start": 0.972,
+   "end": 1.165
+  },
+  {
+   "text": "forecasting",
+   "start": 1.178,
+   "end": 1.861
+  },
+  {
+   "text": "cash",
+   "start": 1.874,
+   "end": 2.222
+  },
+  {
+   "text": "weekly",
+   "start": 2.235,
+   "end": 2.853
+  },
+  {
+   "text": "collecting",
+   "start": 3.085,
+   "end": 3.665
+  },
+  {
+   "text": "receivables",
+   "start": 3.678,
+   "end": 4.438
+  },
+  {
+   "text": "earlier",
+   "start": 4.451,
+   "end": 4.967
+  },
+  {
+   "text": "negotiating",
+   "start": 5.224,
+   "end": 6.075
+  },
+  {
+   "text": "better",
+   "start": 6.088,
+   "end": 6.449
+  },
+  {
+   "text": "payment",
+   "start": 6.462,
+   "end": 6.848
+  },
+  {
+   "text": "terms",
+   "start": 6.861,
+   "end": 7.364
+  },
+  {
+   "text": "and",
+   "start": 7.621,
+   "end": 7.802
+  },
+  {
+   "text": "maintaining",
+   "start": 7.815,
+   "end": 8.395
+  },
+  {
+   "text": "a",
+   "start": 8.407,
+   "end": 8.498
+  },
+  {
+   "text": "cash",
+   "start": 8.51,
+   "end": 8.858
+  },
+  {
+   "text": "buffer",
+   "start": 8.871,
+   "end": 9.451
+  }
+ ]
+}

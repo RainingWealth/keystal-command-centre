@@ -1,0 +1,32 @@
+{
+ "id": "s8b",
+ "text": "Profit looks good on paper.",
+ "duration": 1.875,
+ "words": [
+  {
+   "text": "Profit",
+   "start": 0.0,
+   "end": 0.387
+  },
+  {
+   "text": "looks",
+   "start": 0.4,
+   "end": 0.696
+  },
+  {
+   "text": "good",
+   "start": 0.709,
+   "end": 0.967
+  },
+  {
+   "text": "on",
+   "start": 0.98,
+   "end": 1.173
+  },
+  {
+   "text": "paper",
+   "start": 1.186,
+   "end": 1.805
+  }
+ ]
+}
