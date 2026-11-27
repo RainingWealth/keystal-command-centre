@@ -2,6 +2,9 @@
 
 Ray approved this video ("The Million-Dollar Company That Couldn't Pay Salaries", 2026-11-27) as the gold standard. For any new explainer, start from this folder, not from scratch. Full rationale and vault copy: `11 SOPs/Remotion Cash-Flow Explainer - Gold Standard` in the Rayvern Brain vault. Production detail: `PRODUCTION_NOTES.md`.
 
+## How to invoke
+In a Sonnet session on this repo: `/short-film <story + hook line>`. It runs intake, one Opus planning subagent, then a Sonnet build with a 15 s Checkpoint A, using this project as the default engine for narrator-led business stories. Fallback paste prompt: "Make a vertical explainer video using the gold standard in videos/million-dollar-company (read GOLD_STANDARD.md first). Title / Story / Figures / CTA / Length ~85 s / Voice en-SG male. One finished version. Plan first, then build, render and run the full QA gate."
+
 ## What makes it the bar
 1. Story first: the viewer feels the predicament before the lesson.
 2. One continuous visual world (parallax, consistent character, SVG charts/props), no slides, no stock, no photorealism.
