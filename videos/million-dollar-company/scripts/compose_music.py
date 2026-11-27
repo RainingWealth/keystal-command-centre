@@ -75,7 +75,7 @@ GAP = (tPing - 0.12, tPing + 1.05)  # total silence for the phone ping + buzz
 tBreath = SEG["s6b"]["start"] / FPS + SEG["s6b"]["durSec"]
 tCash = word_t("s8c", r"^cash")
 cues7 = [word_t("s7a", p) for p in (r"^forecasting", r"^collecting", r"^negotiating", r"^maintaining")]
-tEend = SEG["s8e"]["start"] / FPS + SEG["s8e"]["durSec"]
+tEend = SEG["s8f"]["start"] / FPS + SEG["s8f"]["durSec"]
 
 # S1 optimistic D major
 a, b = S["S1"]; seq = ["D", "A", "Bm", "G"]

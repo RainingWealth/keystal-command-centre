@@ -3,7 +3,7 @@ import json, re, sys
 from spellchecker import SpellChecker
 from common import *
 sp = SpellChecker()
-sp.word_frequency.load_words(["sme", "singapore", "singaporean", "payroll", "receivables", "accrual", "invoicing", "hypothetical", "runway", "s", "pm", "am", "inflows", "outflows", "fx", "sgd", "termdays"])
+sp.word_frequency.load_words(["sme", "singapore", "singaporean", "payroll", "receivables", "accrual", "invoicing", "runway", "dm", "s", "pm", "am", "inflows", "outflows", "fx", "sgd", "termdays"])
 srcs = {}
 copy = (ROOT / "src/config/copy.ts").read_text()
 srcs["copy.ts"] = " ".join(re.findall(r"'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"|`([^`]*)`", copy) and [a or b or c for a, b, c in re.findall(r"'((?:[^'\\]|\\.)*)'|\"((?:[^\"\\]|\\.)*)\"|`([^`]*)`", copy)])

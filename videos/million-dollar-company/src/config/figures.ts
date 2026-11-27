@@ -1,4 +1,4 @@
-// Single source of truth for every financial figure. All amounts are illustrative (hypothetical SME).
+// Single source of truth for every financial figure used in the video.
 export const FIG = {
   revenue: 1_200_000,
   profit: 180_000,

@@ -69,6 +69,7 @@ D.cues.forEach((c) => add('tick', c + 8, 0.15));
 add('whoosh_soft', SCENE.S8.start - 10, 0.15);
 add('impact', SCENE.S8.start + T8.cash - 2, 0.5);
 add('pop', SCENE.S8.start + T8.q, 0.14);
+add('pop', SCENE.S8.start + T8.cta, 0.22);
 
 export const AudioLayer: React.FC = () => (
   <>

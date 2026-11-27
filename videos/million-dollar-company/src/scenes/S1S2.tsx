@@ -62,10 +62,7 @@ export const Scene1: React.FC = () => {
       <OfficeWorld variant="day" cam={cam} t={t} dashT={t} actors={<><Founder t={t} smile={0.9} /><OrderChips t={t} /></>} />
       <div style={{position: 'absolute', left: 0, right: 0, top: 250, height: 600, background: 'rgba(10,18,34,0.46)', opacity: 1 - prog(t, 150, 25)}} />
       <div style={{opacity: 1 - prog(t, 150, 58, easeInOut)}}><Scrim height={700} strength={0.9} /></div>
-      <div style={{position: 'absolute', left: 0, right: 0, top: 232, textAlign: 'center', opacity: appear(t, 4, 14, 0).opacity * (1 - prog(t, 168, 36))}}>
-        <div style={{fontFamily: FONT.text, fontWeight: 700, fontSize: 24, letterSpacing: '0.08em', color: C.mute2}}>{COPY.hypothetical}</div>
-      </div>
-      <div style={{position: 'absolute', left: 0, right: 0, top: 292, opacity: titleOut}}>
+      <div style={{position: 'absolute', left: 0, right: 0, top: 262, opacity: titleOut}}>
         <Reveal text={COPY.titleTop} t={t} start={8} size={46} stagger={2} weight={800} letter={0.01} />
         <Reveal text={COPY.titleBottom} t={t} start={22} size={46} color={'#FF9A9A'} stagger={2} weight={800} letter={0.01} style={{marginTop: 4}} />
       </div>

@@ -23,7 +23,15 @@ from faster_whisper import WhisperModel
 model = WhisperModel("base.en", device="cpu", compute_type="int8")
 with wave.open(str(wav)) as _w: audio = np.frombuffer(_w.readframes(_w.getnframes()), dtype="<i2").astype(np.float32) / 32768
 # split at silent gaps between narration segments so each clip is short and unambiguous
-CLIPS = [0, 28.5, 28.5, 49.5, 49.5, 66.7, 66.7, 78.6, 78.6, 85.0]
+_tl = json.loads((DATA / "timeline.json").read_text())
+_segs = [g for sc in _tl["scenes"] for g in sc["segments"]]
+_cuts, _start = [], 0.0
+for a, b in zip(_segs, _segs[1:]):
+    gap_lo, gap_hi = (a["start"] + a["dur"]) / FPS, b["start"] / FPS
+    mid = (gap_lo + gap_hi) / 2
+    if gap_hi - gap_lo >= 0.45 and mid - _start >= 14: _cuts.append(mid); _start = mid
+_edges = [0.0] + _cuts + [_tl["totalSeconds"] + 0.5]
+CLIPS = [x for i in range(len(_edges) - 1) for x in (_edges[i], _edges[i + 1])]
 segs, _ = model.transcribe(audio, language="en", word_timestamps=True, beam_size=5, vad_filter=False, condition_on_previous_text=False, clip_timestamps=CLIPS)
 hyp = []
 words_all = []

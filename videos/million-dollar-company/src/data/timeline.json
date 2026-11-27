@@ -1,7 +1,7 @@
 {
  "fps": 30,
- "totalFrames": 2533,
- "totalSeconds": 84.433,
+ "totalFrames": 2645,
+ "totalSeconds": 88.167,
  "scenes": [
   {
    "id": "S1",
@@ -1012,7 +1012,7 @@
   {
    "id": "S8",
    "start": 2018,
-   "end": 2533,
+   "end": 2645,
    "segments": [
     {
      "id": "s8a",
@@ -1311,9 +1311,91 @@
        "tone": "none"
       }
      ]
+    },
+    {
+     "id": "s8f",
+     "text": "DM me to book a free cash-flow health check.",
+     "start": 2494,
+     "dur": 85,
+     "durSec": 2.828,
+     "caption": false,
+     "words": [
+      {
+       "spoken": "DM",
+       "display": "DM",
+       "start": 83.133,
+       "end": 83.399,
+       "frame": 2494,
+       "tone": "none"
+      },
+      {
+       "spoken": "me",
+       "display": "me",
+       "start": 83.412,
+       "end": 83.592,
+       "frame": 2502,
+       "tone": "none"
+      },
+      {
+       "spoken": "to",
+       "display": "to",
+       "start": 83.605,
+       "end": 83.773,
+       "frame": 2508,
+       "tone": "none"
+      },
+      {
+       "spoken": "book",
+       "display": "book",
+       "start": 83.786,
+       "end": 84.043,
+       "frame": 2514,
+       "tone": "none"
+      },
+      {
+       "spoken": "a",
+       "display": "a",
+       "start": 84.056,
+       "end": 84.147,
+       "frame": 2522,
+       "tone": "none"
+      },
+      {
+       "spoken": "free",
+       "display": "free",
+       "start": 84.159,
+       "end": 84.456,
+       "frame": 2525,
+       "tone": "none"
+      },
+      {
+       "spoken": "cash-flow",
+       "display": "cash-flow",
+       "start": 84.469,
+       "end": 85.074,
+       "frame": 2534,
+       "tone": "none"
+      },
+      {
+       "spoken": "health",
+       "display": "health",
+       "start": 85.087,
+       "end": 85.371,
+       "frame": 2553,
+       "tone": "none"
+      },
+      {
+       "spoken": "check",
+       "display": "check.",
+       "start": 85.384,
+       "end": 85.899,
+       "frame": 2562,
+       "tone": "none"
+      }
+     ]
     }
    ],
-   "dur": 515
+   "dur": 627
   }
  ]
 }

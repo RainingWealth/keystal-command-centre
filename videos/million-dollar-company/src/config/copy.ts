@@ -4,7 +4,6 @@ import {FIG, MARGIN, SHORTFALL, sgd} from './figures';
 export const COPY = {
   titleTop: 'THE MILLION-DOLLAR COMPANY',
   titleBottom: "THAT COULDN'T PAY SALARIES",
-  hypothetical: 'A HYPOTHETICAL SINGAPORE SME  ·  ILLUSTRATIVE FIGURES',
   revenueLabel: 'ANNUAL REVENUE',
   s1Orders: ['+ ORDER', '+ ORDER', '+ ORDER'],
   stmtTitle: 'INCOME STATEMENT  ·  ON PAPER',
@@ -47,6 +46,7 @@ export const COPY = {
   cashWord: 'CASH',
   finalLine: 'A profitable business can still run out of cash.',
   question: `Is your business ready for a ${FIG.termDays}-day payment delay?`,
-  disclaimer: 'Hypothetical company. Illustrative figures. General information only.',
+  ctaHeadline: 'FREE CASH-FLOW HEALTH CHECK',
+  ctaAction: 'DM ME',
   marginLabel: `${MARGIN}%`,
 } as const;

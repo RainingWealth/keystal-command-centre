@@ -1,13 +1,13 @@
 # The Million-Dollar Company That Couldn't Pay Salaries
 
-Premium animated business explainer, built natively in Remotion (React + TypeScript). One finished version, 1080 × 1920 (9:16), 30 fps, 84.4 s, H.264 / AAC. All figures are illustrative; the company is hypothetical.
+Premium animated business explainer, built natively in Remotion (React + TypeScript). One finished version, 1080 × 1920 (9:16), 30 fps, 88.2 s, H.264 / AAC. The company and its figures are a fictional case study; the video carries no on-screen disclaimer wording, by request.
 
 ## Deliverables (`output/`)
 
 | File | What it is |
 |---|---|
 | `million-dollar-company-cashflow.mp4` | The finished video (H.264 High, yuv420p, BT.709, AAC-LC 48 kHz stereo, −14.0 LUFS, true peak −1.5 dBFS) |
-| `million-dollar-company-cashflow.srt` | Subtitles timed from the final voiceover (26 cues, max two lines of ≤42 characters) |
+| `million-dollar-company-cashflow.srt` | Subtitles timed from the final voiceover (27 cues, max two lines of ≤42 characters) |
 | `narration.wav` / `narration.mp3` | The voiceover alone, placed on the video timeline (sample-aligned with the MP4) |
 | `preview.png` | Representative frame: the payroll notification and the founder's reaction |
 
@@ -18,7 +18,7 @@ The Remotion project is this folder (`src/`, `public/`, `scripts/`).
 - **Provider and voice:** Microsoft Edge neural TTS (via `edge-tts`), voice `en-SG-WayneNeural`: male, Singapore English. It was the only en-SG male voice in the live voice list (the other is `en-SG-LunaNeural`, female).
 - **Delivery:** rate −3% overall, −5% on the "tonight, the founder checks the bank account" line, −7% on every line that carries an amount; pitch −2 Hz for a calmer, lower register. Each sentence group is a separate synthesis, so pauses (0.3–1.0 s, longest before the closing lines and around S$14,000) are set on the timeline instead of left to the engine.
 - **Processing:** per-segment head/tail trim, 70 Hz high-pass, gentle 3 kHz presence lift, light compression, level-matched to −21 dBFS RMS.
-- **Script:** the brief's narration word for word. Two additions: the closing lines "A profitable business can still run out of cash." and "Is your business ready for a ninety-day payment delay?" are voiced as well as shown on screen. Amounts are spelled out for the voice ("one point two million", "thirty-six thousand").
+- **Script:** the brief's narration word for word. Three additions: the closing lines "A profitable business can still run out of cash." and "Is your business ready for a ninety-day payment delay?" are voiced as well as shown on screen, and the video now ends with a voiced call to action, "DM me to book a free cash-flow health check." Amounts are spelled out for the voice ("one point two million", "thirty-six thousand").
 
 ## Music and sound
 
@@ -36,11 +36,15 @@ The Remotion project is this folder (`src/`, `public/`, `scripts/`).
 | S5 The growth paradox | 39.83s | 46.73s | 6.90s | s5a 40.03s, s5b 42.47s |
 | S6 The real problem | 46.73s | 56.47s | 9.73s | s6a 46.93s, s6b 50.17s |
 | S7 How to prevent it | 56.47s | 67.27s | 10.80s | s7a 56.77s |
-| S8 The final lesson | 67.27s | 84.43s | 17.17s | s8a 67.67s, s8b 70.27s, s8c 72.47s, s8d 75.37s, s8e 79.40s |
+| S8 The final lesson | 67.27s | 88.17s | 20.90s | s8a 67.67s, s8b 70.27s, s8c 72.47s, s8d 75.37s, s8e 79.40s, s8f 83.13s |
 
-Total: 2533 frames = 84.43s at 30 fps
+Total: 2645 frames = 88.17s at 30 fps
 
 All animation cues (counters, chips, cards, captions, sound effects) read word start times from the measured narration, so changing the script and re-running `npm run assets` re-times everything.
+
+## Call to action
+
+After the closing question the voice says "DM me to book a free cash-flow health check." and an end card shows FREE CASH-FLOW HEALTH CHECK with a DM ME button, held until the fade to black. No phone number, link or handle is shown; the destination is "DM me".
 
 ## Figures (single source: `src/config/figures.ts`)
 
@@ -54,15 +58,15 @@ All animation cues (counters, chips, cards, captions, sound effects) read word s
 | Payroll shortfall | S$22,000 (derived, asserted at build time) |
 | Customer payment term | 90 days |
 
-The video states three times that the company is hypothetical (opening tag, closing disclaimer, "on paper, not in the bank"). Revenue and profit never appear as bank cash: bank cash appears only on the phone, labelled "Available cash". S2 notes that profit is booked when invoiced (accrual) and S6 repeats it. S7 closes with "Helps narrow the gap. No guarantee for every business."
+The video carries no "hypothetical" or "illustrative" wording (removed by request). Revenue and profit never appear as bank cash: bank cash appears only on the phone, labelled "Available cash". S2 notes that profit is booked when invoiced (accrual) and S6 repeats it. S7 closes with "Helps narrow the gap. No guarantee for every business."
 
 ## Quality checks run on the final MP4
 
 | Check | Result |
 |---|---|
-| Format | 1080×1920, 30 fps, H.264 High yuv420p BT.709; AAC-LC 48 kHz stereo; 84.50 s; decodes with no errors |
+| Format | 1080×1920, 30 fps, H.264 High yuv420p BT.709; AAC-LC 48 kHz stereo; 88.20 s; decodes with no errors |
 | Loudness | −14.0 LUFS integrated, LRA 3.1 LU, true peak −1.5 dBFS (two-pass `loudnorm`) |
-| Voiceover audible and accurate | Whisper (`base.en`) transcript of the delivered MP4 vs script: 0.7% word error (1 of 142 words; a recogniser misread of "reported") |
+| Voiceover audible and accurate | Whisper (`base.en`) transcript of the delivered MP4 vs script: 2.6% word error (4 of 152 words; recogniser misreads of "reported", "suppliers want" and "unpaid"); the CTA line is transcribed correctly |
 | Audio/video sync | Cross-correlation of the MP4's audio against `narration.wav`: 0.0 ms offset. TTS word timings sit within about 50 ms of audio onsets and offsets (worst trailing end 0.19 s) |
 | Figures | `scripts/check_figures.py`: 15 checks pass (margin 15%, shortfall S$22,000, caption amounts, no hard-coded amounts in components, narration wording) |
 | Spelling | `scripts/spellcheck.py`: no unknown words in on-screen copy, narration or subtitles |
@@ -92,4 +96,4 @@ python3 scripts/qa_transcribe.py    # audio QA on the delivered file
 - Illustrations are stylised vector characters. The skyline is a generic Singapore-style silhouette (a Marina Bay Sands-like deck on three towers), not a trace of any real building.
 - The bottom third of the frame is deliberately calm so platform buttons and captions do not collide with the story.
 - **Licences:** Inter fonts are SIL OFL 1.1. FluidR3_GM is MIT-licensed (Frank Wen). Remotion's licence lets individuals, for-profit organisations with up to 3 employees and non-profits use it free of charge (commercial use included); larger for-profit companies need a Remotion Company License (see `node_modules/remotion/LICENSE.md`).
-- Figures are illustrative and are not financial advice.
+- Figures are fictional and the video is general information, not financial advice.

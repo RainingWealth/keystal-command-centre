@@ -1,0 +1,52 @@
+{
+ "id": "s8f",
+ "text": "DM me to book a free cash-flow health check.",
+ "duration": 2.828,
+ "words": [
+  {
+   "text": "DM",
+   "start": 0.0,
+   "end": 0.266
+  },
+  {
+   "text": "me",
+   "start": 0.279,
+   "end": 0.459
+  },
+  {
+   "text": "to",
+   "start": 0.472,
+   "end": 0.64
+  },
+  {
+   "text": "book",
+   "start": 0.653,
+   "end": 0.91
+  },
+  {
+   "text": "a",
+   "start": 0.923,
+   "end": 1.014
+  },
+  {
+   "text": "free",
+   "start": 1.026,
+   "end": 1.323
+  },
+  {
+   "text": "cash-flow",
+   "start": 1.336,
+   "end": 1.941
+  },
+  {
+   "text": "health",
+   "start": 1.954,
+   "end": 2.238
+  },
+  {
+   "text": "check",
+   "start": 2.251,
+   "end": 2.766
+  }
+ ]
+}

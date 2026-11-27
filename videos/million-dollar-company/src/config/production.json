@@ -174,7 +174,7 @@
     {
       "id": "S8",
       "leadIn": 0.4,
-      "tail": 2.0,
+      "tail": 2.2,
       "segments": [
         {
           "id": "s8a",
@@ -200,6 +200,12 @@
         {
           "id": "s8e",
           "text": "Is your business ready for a ninety-day payment delay?",
+          "caption": false,
+          "gapAfter": 0.7
+        },
+        {
+          "id": "s8f",
+          "text": "DM me to book a free cash-flow health check.",
           "caption": false,
           "gapAfter": 0
         }
