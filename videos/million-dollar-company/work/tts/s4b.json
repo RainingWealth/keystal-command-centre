@@ -1,0 +1,37 @@
+{
+ "id": "s4b",
+ "text": "Customers pay ninety days after invoicing.",
+ "duration": 2.928,
+ "words": [
+  {
+   "text": "Customers",
+   "start": 0.0,
+   "end": 0.565
+  },
+  {
+   "text": "pay",
+   "start": 0.578,
+   "end": 0.784
+  },
+  {
+   "text": "ninety",
+   "start": 0.797,
+   "end": 1.3
+  },
+  {
+   "text": "days",
+   "start": 1.313,
+   "end": 1.687
+  },
+  {
+   "text": "after",
+   "start": 1.699,
+   "end": 2.047
+  },
+  {
+   "text": "invoicing",
+   "start": 2.06,
+   "end": 2.924
+  }
+ ]
+}

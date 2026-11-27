@@ -1,0 +1,67 @@
+{
+ "id": "s6b",
+ "text": "Its cash is trapped in unpaid invoices, while real bills keep arriving.",
+ "duration": 4.683,
+ "words": [
+  {
+   "text": "Its",
+   "start": 0.0,
+   "end": 0.189
+  },
+  {
+   "text": "cash",
+   "start": 0.202,
+   "end": 0.537
+  },
+  {
+   "text": "is",
+   "start": 0.55,
+   "end": 0.692
+  },
+  {
+   "text": "trapped",
+   "start": 0.705,
+   "end": 1.053
+  },
+  {
+   "text": "in",
+   "start": 1.066,
+   "end": 1.22
+  },
+  {
+   "text": "unpaid",
+   "start": 1.233,
+   "end": 1.671
+  },
+  {
+   "text": "invoices",
+   "start": 1.684,
+   "end": 2.522
+  },
+  {
+   "text": "while",
+   "start": 2.767,
+   "end": 3.05
+  },
+  {
+   "text": "real",
+   "start": 3.063,
+   "end": 3.36
+  },
+  {
+   "text": "bills",
+   "start": 3.372,
+   "end": 3.682
+  },
+  {
+   "text": "keep",
+   "start": 3.695,
+   "end": 3.939
+  },
+  {
+   "text": "arriving",
+   "start": 3.952,
+   "end": 4.635
+  }
+ ]
+}

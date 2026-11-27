@@ -1,0 +1,47 @@
+{
+ "id": "s3a",
+ "text": "But tonight, the founder checks the bank account.",
+ "duration": 3.11,
+ "words": [
+  {
+   "text": "But",
+   "start": 0.0,
+   "end": 0.201
+  },
+  {
+   "text": "tonight",
+   "start": 0.214,
+   "end": 0.767
+  },
+  {
+   "text": "the",
+   "start": 1.017,
+   "end": 1.175
+  },
+  {
+   "text": "founder",
+   "start": 1.188,
+   "end": 1.543
+  },
+  {
+   "text": "checks",
+   "start": 1.556,
+   "end": 1.898
+  },
+  {
+   "text": "the",
+   "start": 1.911,
+   "end": 2.043
+  },
+  {
+   "text": "bank",
+   "start": 2.056,
+   "end": 2.346
+  },
+  {
+   "text": "account",
+   "start": 2.359,
+   "end": 2.99
+  }
+ ]
+}

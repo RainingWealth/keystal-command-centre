@@ -1,0 +1,52 @@
+{
+ "id": "s8d",
+ "text": "A profitable business can still run out of cash.",
+ "duration": 3.224,
+ "words": [
+  {
+   "text": "A",
+   "start": 0.0,
+   "end": 0.093
+  },
+  {
+   "text": "profitable",
+   "start": 0.106,
+   "end": 0.751
+  },
+  {
+   "text": "business",
+   "start": 0.763,
+   "end": 1.253
+  },
+  {
+   "text": "can",
+   "start": 1.266,
+   "end": 1.446
+  },
+  {
+   "text": "still",
+   "start": 1.459,
+   "end": 1.82
+  },
+  {
+   "text": "run",
+   "start": 1.833,
+   "end": 2.091
+  },
+  {
+   "text": "out",
+   "start": 2.104,
+   "end": 2.284
+  },
+  {
+   "text": "of",
+   "start": 2.297,
+   "end": 2.452
+  },
+  {
+   "text": "cash",
+   "start": 2.464,
+   "end": 3.096
+  }
+ ]
+}

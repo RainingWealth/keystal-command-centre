@@ -1,0 +1,42 @@
+{
+ "id": "s2b",
+ "text": "Reported profit? One hundred and eighty thousand.",
+ "duration": 4.381,
+ "words": [
+  {
+   "text": "Reported",
+   "start": 0.0,
+   "end": 0.661
+  },
+  {
+   "text": "profit",
+   "start": 0.674,
+   "end": 1.346
+  },
+  {
+   "text": "One",
+   "start": 2.277,
+   "end": 2.573
+  },
+  {
+   "text": "hundred",
+   "start": 2.586,
+   "end": 3.057
+  },
+  {
+   "text": "and",
+   "start": 3.07,
+   "end": 3.245
+  },
+  {
+   "text": "eighty",
+   "start": 3.258,
+   "end": 3.635
+  },
+  {
+   "text": "thousand",
+   "start": 3.648,
+   "end": 4.401
+  }
+ ]
+}

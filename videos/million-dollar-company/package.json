@@ -1,0 +1,27 @@
+{
+  "name": "million-dollar-company-cashflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Million-Dollar Company That Couldn't Pay Salaries - Remotion explainer (1080x1920, 30fps)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "assets": "python3 scripts/narration.py && python3 scripts/build_timeline.py && python3 scripts/make_sfx.py && python3 scripts/compose_music.py && python3 scripts/export_narration.py",
+    "timeline": "python3 scripts/build_timeline.py",
+    "render:draft": "remotion render src/index.ts Main work/draft.mp4 --scale=0.5 --crf=26",
+    "render": "remotion render src/index.ts Main work/raw.mp4",
+    "master": "bash scripts/master.sh"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.546",
+    "@remotion/fonts": "4.0.546",
+    "@remotion/media": "4.0.546",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.546"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.2",
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,215 @@
+{
+  "video": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920
+  },
+  "voice": {
+    "name": "en-SG-WayneNeural",
+    "rate": "-3%",
+    "pitch": "-2Hz"
+  },
+  "displayPhrases": {
+    "one point two million": "S$1.2 million",
+    "one hundred and eighty thousand": "S$180,000",
+    "fourteen thousand dollars": "S$14,000",
+    "thirty-six thousand": "S$36,000",
+    "ninety days": "90 days",
+    "ninety-day": "90-day"
+  },
+  "tones": {
+    "amount": [
+      "^S\\$"
+    ],
+    "cyan": [
+      "^cash$",
+      "^cash\\W*$"
+    ],
+    "amber": [
+      "^90$",
+      "^90-day",
+      "^receivables",
+      "^unpaid$",
+      "^invoices$",
+      "^invoicing"
+    ],
+    "red": [
+      "^payroll",
+      "^salaries",
+      "^bills",
+      "^shortfall",
+      "^now\\b"
+    ]
+  },
+  "scenes": [
+    {
+      "id": "S1",
+      "leadIn": 0.6,
+      "tail": 0.3,
+      "segments": [
+        {
+          "id": "s1a",
+          "text": "This company makes over one million dollars a year.",
+          "gapAfter": 0.5
+        },
+        {
+          "id": "s1b",
+          "text": "On paper, business is good.",
+          "gapAfter": 0
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "leadIn": 0.2,
+      "tail": 1.0,
+      "segments": [
+        {
+          "id": "s2a",
+          "text": "Annual revenue? One point two million.",
+          "rate": "-7%",
+          "gapAfter": 0.45
+        },
+        {
+          "id": "s2b",
+          "text": "Reported profit? One hundred and eighty thousand.",
+          "rate": "-7%",
+          "gapAfter": 0
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "leadIn": 0.5,
+      "tail": 2.2,
+      "segments": [
+        {
+          "id": "s3a",
+          "text": "But tonight, the founder checks the bank account.",
+          "rate": "-5%",
+          "gapAfter": 0.9
+        },
+        {
+          "id": "s3b",
+          "text": "Fourteen thousand dollars.",
+          "rate": "-7%",
+          "gapAfter": 0.55
+        },
+        {
+          "id": "s3c",
+          "text": "Tomorrow's payroll? Thirty-six thousand.",
+          "rate": "-7%",
+          "gapAfter": 0
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "leadIn": 0.2,
+      "tail": 0.7,
+      "segments": [
+        {
+          "id": "s4a",
+          "text": "What happened?",
+          "gapAfter": 0.45
+        },
+        {
+          "id": "s4b",
+          "text": "Customers pay ninety days after invoicing.",
+          "gapAfter": 0.5
+        },
+        {
+          "id": "s4c",
+          "text": "Suppliers want payment now. And salaries don't wait.",
+          "gapAfter": 0
+        }
+      ]
+    },
+    {
+      "id": "S5",
+      "leadIn": 0.2,
+      "tail": 0.6,
+      "segments": [
+        {
+          "id": "s5a",
+          "text": "Every new order looks like growth.",
+          "gapAfter": 0.45
+        },
+        {
+          "id": "s5b",
+          "text": "But every order also needs cash before the customer pays.",
+          "gapAfter": 0
+        }
+      ]
+    },
+    {
+      "id": "S6",
+      "leadIn": 0.2,
+      "tail": 1.6,
+      "segments": [
+        {
+          "id": "s6a",
+          "text": "The company isn't necessarily losing money.",
+          "gapAfter": 0.5
+        },
+        {
+          "id": "s6b",
+          "text": "Its cash is trapped in unpaid invoices, while real bills keep arriving.",
+          "gapAfter": 0
+        }
+      ]
+    },
+    {
+      "id": "S7",
+      "leadIn": 0.3,
+      "tail": 1.0,
+      "segments": [
+        {
+          "id": "s7a",
+          "text": "The solution starts with forecasting cash weekly, collecting receivables earlier, negotiating better payment terms, and maintaining a cash buffer.",
+          "gapAfter": 0
+        }
+      ]
+    },
+    {
+      "id": "S8",
+      "leadIn": 0.4,
+      "tail": 2.2,
+      "segments": [
+        {
+          "id": "s8a",
+          "text": "Because revenue makes headlines.",
+          "gapAfter": 0.3
+        },
+        {
+          "id": "s8b",
+          "text": "Profit looks good on paper.",
+          "gapAfter": 0.3
+        },
+        {
+          "id": "s8c",
+          "text": "But cash pays salaries.",
+          "gapAfter": 0.8
+        },
+        {
+          "id": "s8d",
+          "text": "A profitable business can still run out of cash.",
+          "caption": false,
+          "gapAfter": 0.8
+        },
+        {
+          "id": "s8e",
+          "text": "Is your business ready for a ninety-day payment delay?",
+          "caption": false,
+          "gapAfter": 0.7
+        },
+        {
+          "id": "s8f",
+          "text": "DM me to book a free cash-flow health check.",
+          "caption": false,
+          "gapAfter": 0
+        }
+      ]
+    }
+  ]
+}

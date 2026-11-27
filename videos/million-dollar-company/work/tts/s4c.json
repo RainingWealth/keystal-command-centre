@@ -1,0 +1,47 @@
+{
+ "id": "s4c",
+ "text": "Suppliers want payment now. And salaries don't wait.",
+ "duration": 4.304,
+ "words": [
+  {
+   "text": "Suppliers",
+   "start": 0.0,
+   "end": 0.569
+  },
+  {
+   "text": "want",
+   "start": 0.582,
+   "end": 0.84
+  },
+  {
+   "text": "payment",
+   "start": 0.853,
+   "end": 1.214
+  },
+  {
+   "text": "now",
+   "start": 1.227,
+   "end": 1.613
+  },
+  {
+   "text": "And",
+   "start": 2.504,
+   "end": 2.723
+  },
+  {
+   "text": "salaries",
+   "start": 2.736,
+   "end": 3.329
+  },
+  {
+   "text": "don't",
+   "start": 3.341,
+   "end": 3.625
+  },
+  {
+   "text": "wait",
+   "start": 3.638,
+   "end": 4.231
+  }
+ ]
+}

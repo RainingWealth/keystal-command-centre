@@ -1,0 +1,52 @@
+{
+ "id": "s1a",
+ "text": "This company makes over one million dollars a year.",
+ "duration": 3.172,
+ "words": [
+  {
+   "text": "This",
+   "start": 0.0,
+   "end": 0.266
+  },
+  {
+   "text": "company",
+   "start": 0.279,
+   "end": 0.743
+  },
+  {
+   "text": "makes",
+   "start": 0.755,
+   "end": 1.103
+  },
+  {
+   "text": "over",
+   "start": 1.116,
+   "end": 1.4
+  },
+  {
+   "text": "one",
+   "start": 1.413,
+   "end": 1.67
+  },
+  {
+   "text": "million",
+   "start": 1.683,
+   "end": 2.018
+  },
+  {
+   "text": "dollars",
+   "start": 2.031,
+   "end": 2.482
+  },
+  {
+   "text": "a",
+   "start": 2.495,
+   "end": 2.547
+  },
+  {
+   "text": "year",
+   "start": 2.56,
+   "end": 3.088
+  }
+ ]
+}

@@ -1,0 +1,52 @@
+{
+ "id": "s8e",
+ "text": "Is your business ready for a ninety-day payment delay?",
+ "duration": 3.05,
+ "words": [
+  {
+   "text": "Is",
+   "start": 0.0,
+   "end": 0.143
+  },
+  {
+   "text": "your",
+   "start": 0.156,
+   "end": 0.285
+  },
+  {
+   "text": "business",
+   "start": 0.298,
+   "end": 0.774
+  },
+  {
+   "text": "ready",
+   "start": 0.787,
+   "end": 1.11
+  },
+  {
+   "text": "for",
+   "start": 1.122,
+   "end": 1.303
+  },
+  {
+   "text": "a",
+   "start": 1.316,
+   "end": 1.342
+  },
+  {
+   "text": "ninety-day",
+   "start": 1.354,
+   "end": 1.999
+  },
+  {
+   "text": "payment",
+   "start": 2.012,
+   "end": 2.385
+  },
+  {
+   "text": "delay",
+   "start": 2.398,
+   "end": 2.965
+  }
+ ]
+}

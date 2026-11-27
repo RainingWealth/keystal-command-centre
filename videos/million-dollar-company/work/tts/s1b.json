@@ -1,0 +1,32 @@
+{
+ "id": "s1b",
+ "text": "On paper, business is good.",
+ "duration": 2.457,
+ "words": [
+  {
+   "text": "On",
+   "start": 0.0,
+   "end": 0.181
+  },
+  {
+   "text": "paper",
+   "start": 0.194,
+   "end": 0.877
+  },
+  {
+   "text": "business",
+   "start": 1.096,
+   "end": 1.651
+  },
+  {
+   "text": "is",
+   "start": 1.663,
+   "end": 1.882
+  },
+  {
+   "text": "good",
+   "start": 1.895,
+   "end": 2.372
+  }
+ ]
+}
